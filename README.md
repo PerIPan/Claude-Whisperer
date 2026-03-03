@@ -1,4 +1,4 @@
-# Claude Local Speech (STT + TTS + Whisper)
+# Claude Whisperer
 
 Voice mode for [Claude Code](https://claude.ai/claude-code) on Apple Silicon. Talk to Claude, hear Claude talk back — all running locally on your Mac.
 
@@ -33,8 +33,8 @@ You speak -> Whisper (STT) -> Claude Code -> [VOICE: tag] -> Kokoro (TTS) -> You
 
 ```bash
 # Clone
-git clone https://github.com/PerIPan/Claude-Local-Speech-STT-TTS-Whisper.git
-cd Claude-Local-Speech-STT-TTS-Whisper
+git clone https://github.com/PerIPan/Claude-Whisperer.git
+cd Claude-Whisperer
 
 # Install (creates venv, downloads models)
 chmod +x setup.sh
@@ -83,7 +83,7 @@ Add the hook to your `.claude/settings.json` (global or project):
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/Claude-Local-Speech-STT-TTS-Whisper/hooks/tts-hook.sh",
+            "command": "/path/to/Claude-Whisperer/hooks/tts-hook.sh",
             "timeout": 60
           }
         ]
@@ -142,7 +142,7 @@ Environment variables to customize behavior:
 ## File Structure
 
 ```
-Claude-Local-Speech-STT-TTS-Whisper/
+Claude-Whisperer/
 ├── CLAUDE.md                  # Voice tag instructions (copy to your project)
 ├── setup.sh                   # One-click installer
 ├── hooks/
@@ -191,7 +191,8 @@ Here's the full technical explanation with code...
 - This is a one-time macOS permission — required for any app to send keystrokes
 
 **Voice input picks up TTS audio (feedback loop):**
-- If the mic picks up the speaker's TTS output, use headphones or lower speaker volume
+- Auto-pause is built in — the mic automatically pauses while TTS is playing
+- If you still hear feedback, use headphones or lower speaker volume
 - Or run with `--no-submit` to review before sending: `python scripts/voice-input.py --loop --no-submit`
 
 ## Credits

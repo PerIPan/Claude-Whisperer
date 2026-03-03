@@ -5,6 +5,7 @@
 # New responses interrupt previous playback
 
 PIDFILE="/tmp/tts_hook.pid"
+LOCKFILE="/tmp/tts_playing.lock"
 
 # Kill any previous TTS playback
 if [ -f "$PIDFILE" ]; then
@@ -12,6 +13,7 @@ if [ -f "$PIDFILE" ]; then
   kill "$OLD_PID" 2>/dev/null
   pkill -P "$OLD_PID" 2>/dev/null
   rm -f "$PIDFILE"
+  rm -f "$LOCKFILE"
 fi
 
 INPUT=$(cat)
@@ -64,7 +66,10 @@ fi
     --output "$TMPFILE" 2>/dev/null
 
   if [ -s "$TMPFILE" ]; then
+    # Signal voice-input to pause listening during playback
+    touch "$LOCKFILE"
     afplay "$TMPFILE" 2>/dev/null
+    rm -f "$LOCKFILE"
   fi
   rm -f "$TMPFILE" 2>/dev/null
   rm -f "$PIDFILE" 2>/dev/null

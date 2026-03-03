@@ -23,6 +23,7 @@ import sounddevice as sd
 import soundfile as sf
 
 STT_URL = os.getenv("STT_URL", "http://localhost:8000/v1/audio/transcriptions")
+TTS_LOCKFILE = "/tmp/tts_playing.lock"
 SAMPLE_RATE = 16000
 SILENCE_THRESHOLD = 0.02
 SILENCE_DURATION = 1.5  # seconds of silence before processing
@@ -206,6 +207,11 @@ def main():
 
     while True:
         try:
+            # Wait while TTS is playing to avoid feedback loop
+            if os.path.exists(TTS_LOCKFILE):
+                time.sleep(0.2)
+                continue
+
             if args.hold:
                 audio = record_while_key_held()
             else:
