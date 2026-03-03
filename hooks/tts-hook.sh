@@ -7,16 +7,16 @@
 PIDFILE="/tmp/tts_hook.pid"
 LOCKFILE="/tmp/tts_playing.lock"
 
-# Lock IMMEDIATELY so mic stops before anything else
-touch "$LOCKFILE"
-
-# Kill any previous TTS playback
+# Kill any previous TTS playback (check process name before killing)
 if [ -f "$PIDFILE" ]; then
   OLD_PID=$(cat "$PIDFILE")
+  # Only kill if the PID is still our background subshell
+  if kill -0 "$OLD_PID" 2>/dev/null; then
+    kill "$OLD_PID" 2>/dev/null
+    pkill -P "$OLD_PID" 2>/dev/null
+  fi
   # Clean up orphaned temp files from previous runs
   find /tmp -name "tts_*.wav" -mmin +1 -delete 2>/dev/null
-  kill "$OLD_PID" 2>/dev/null
-  pkill -P "$OLD_PID" 2>/dev/null
   rm -f "$PIDFILE"
 fi
 
@@ -28,7 +28,7 @@ if [ "$(echo "$INPUT" | jq -r '.stop_hook_active')" = "true" ]; then
 fi
 
 TEXT=$(echo "$INPUT" | jq -r '.last_assistant_message // empty')
-[ -z "$TEXT" ] && { rm -f "$LOCKFILE"; exit 0; }
+[ -z "$TEXT" ] && exit 0
 
 # Extract [VOICE: ...] tag if present (Claude generates the spoken summary)
 # Use tail -1 to grab the LAST [VOICE:] tag (avoids matching literal mentions of the tag)
@@ -55,7 +55,10 @@ if [ -z "$SPEECH" ]; then
   fi
 fi
 
-[ -z "$SPEECH" ] && { rm -f "$LOCKFILE"; exit 0; }
+[ -z "$SPEECH" ] && exit 0
+
+# Lock AFTER validation — only when we know we'll play audio
+touch "$LOCKFILE"
 
 # Run entire TTS pipeline in background (non-blocking)
 (
@@ -64,7 +67,7 @@ fi
   MODEL="${TTS_MODEL:-prince-canuma/Kokoro-82M}"
   TMPFILE=$(mktemp /tmp/tts_XXXXXX.wav)
 
-  # Lock already created at top of script; retry TTS up to 3 times
+  # Retry TTS up to 3 times
   for attempt in 1 2 3; do
     curl -s -X POST "$TTS_URL" \
       -H "Content-Type: application/json" \

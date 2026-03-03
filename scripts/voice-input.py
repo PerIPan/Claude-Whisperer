@@ -13,20 +13,26 @@ Activate the mlx venv before running.
 import argparse
 import io
 import os
+import re
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 import numpy as np
+import requests
 import sounddevice as sd
 import soundfile as sf
 
 STT_URL = os.getenv("STT_URL", "http://localhost:8000/v1/audio/transcriptions")
 TTS_LOCKFILE = "/tmp/tts_playing.lock"
 SAMPLE_RATE = 16000
-SILENCE_THRESHOLD = 0.04
-SILENCE_DURATION = 2.0  # seconds of silence before processing
+SILENCE_THRESHOLD = None  # set by calibration at startup
+SILENCE_DURATION = 3.0  # seconds of silence before stop recording
+NOISE_MULTIPLIER = 4.0  # threshold = noise_floor × this
+MIN_THRESHOLD = 0.01  # absolute minimum — above keyboard typing noise (~0.007)
+TTS_WAIT_TIMEOUT = 120  # max seconds to wait for TTS before resuming mic
 
 
 def calibrate_noise(duration=1.0):
@@ -57,6 +63,12 @@ def record_until_silence(silence_duration=SILENCE_DURATION, max_duration=30):
     max_chunks = int(max_duration / chunk_duration)
     silence_chunks_needed = int(silence_duration / chunk_duration)
     has_speech = False
+    speech_onset_count = 0
+    SPEECH_ONSET_NEEDED = 5  # need 5 consecutive loud chunks (~500ms) to confirm speech
+    # Pre-roll buffer: keep last 20 chunks (~2000ms) before speech detected
+    # so word onsets aren't clipped
+    pre_roll = []
+    PRE_ROLL_SIZE = 20
 
     stream = sd.InputStream(
         samplerate=SAMPLE_RATE,
@@ -77,14 +89,33 @@ def record_until_silence(silence_duration=SILENCE_DURATION, max_duration=30):
             energy = np.sqrt(np.mean(data**2))
 
             if energy > SILENCE_THRESHOLD:
-                has_speech = True
+                if not has_speech:
+                    # Speech onset detection: require consecutive loud chunks
+                    # to filter out keyboard clicks (single-chunk spikes).
+                    # Current chunk is added to pre_roll, and when onset is
+                    # confirmed, all pre_roll chunks (including onset chunks)
+                    # are moved to the recording buffer via chunks.extend().
+                    speech_onset_count += 1
+                    pre_roll.append(data.copy())
+                    if len(pre_roll) > PRE_ROLL_SIZE:
+                        pre_roll.pop(0)
+                    if speech_onset_count >= SPEECH_ONSET_NEEDED:
+                        has_speech = True
+                        chunks.extend(pre_roll)
+                        pre_roll.clear()
+                    continue
                 silent_chunks = 0
                 chunks.append(data.copy())
             elif has_speech:
-                # Only keep silence chunks after speech started
+                # Keep silence chunks after speech started
                 silent_chunks += 1
                 chunks.append(data.copy())
-            # else: discard pre-speech silence
+            else:
+                # Pre-speech: keep rolling buffer of recent chunks
+                speech_onset_count = 0  # reset — isolated clicks won't accumulate
+                pre_roll.append(data.copy())
+                if len(pre_roll) > PRE_ROLL_SIZE:
+                    pre_roll.pop(0)
 
             if has_speech and silent_chunks >= silence_chunks_needed:
                 break
@@ -121,8 +152,6 @@ def record_while_key_held():
     )
     stream.start()
 
-    import threading
-
     stop_flag = threading.Event()
 
     def wait_for_enter():
@@ -150,14 +179,11 @@ def record_while_key_held():
 
 def transcribe(audio):
     """Send audio to Whisper STT server."""
-    import requests
-
-    # Write to temp wav file
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-        sf.write(f.name, audio, SAMPLE_RATE)
-        tmp_path = f.name
-
+    tmp_path = None
     try:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            tmp_path = f.name
+            sf.write(tmp_path, audio, SAMPLE_RATE)
         with open(tmp_path, "rb") as f:
             resp = requests.post(
                 STT_URL,
@@ -169,14 +195,23 @@ def transcribe(audio):
         result = resp.json()
         return result.get("text", "").strip()
     finally:
-        os.unlink(tmp_path)
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 ALLOWED_APPS = {"Terminal", "iTerm2", "Code", "Code - Insiders", "Electron", "Warp"}
 
+# Process name → app bundle name (for AppleScript 'tell application' calls)
+# get_frontmost_app() returns process names; AppleScript activate needs app names
+PROCESS_TO_APP = {
+    "Electron": "Visual Studio Code",
+    "Code": "Visual Studio Code",
+    "Code - Insiders": "Visual Studio Code - Insiders",
+}
+
 
 def get_frontmost_app():
-    """Get the name of the currently focused application."""
+    """Get the name of the currently focused application process."""
     result = subprocess.run(
         ["osascript", "-e",
          'tell application "System Events" to get name of first application process whose frontmost is true'],
@@ -185,62 +220,74 @@ def get_frontmost_app():
     return result.stdout.strip()
 
 
+def app_name_for_activate(process_name):
+    """Convert process name to app name for AppleScript 'tell application' calls."""
+    return PROCESS_TO_APP.get(process_name, process_name)
+
+
 def check_submit_trigger(text):
-    """Check if text ends with a submit trigger phrase. Returns (cleaned_text, should_submit)."""
-    import re
+    """Check if text ends with a submit trigger phrase. Returns (cleaned_text, should_submit).
+    If the entire text IS a trigger word (e.g. just "submit"), returns ("", True) to
+    submit whatever is already in the input field (press Enter only, no new text).
+    """
     lower = text.lower().rstrip(" .,!?")
-    triggers = ["submit", "send it", "go ahead"]
+    triggers = ["submit", "send it", "go ahead", "send", "enter"]
     for trigger in triggers:
         if lower.endswith(trigger):
             # Strip the trigger word and trailing whitespace/punctuation
             pattern = r'\s*\b' + re.escape(trigger) + r'[.!?,]?$'
             cleaned = re.sub(pattern, '', text.strip(), flags=re.IGNORECASE)
-            if cleaned:  # don't submit empty text
-                return cleaned, True
+            return cleaned, True
     return text, False
 
 
-def type_text(text, submit=True):
-    """Type text into the active application using AppleScript."""
-    # Verify we're typing into an allowed app
-    app = get_frontmost_app()
-    if app not in ALLOWED_APPS:
-        print(f"Warning: '{app}' is focused, not Claude Code. Skipping input.", flush=True)
+TARGET_APP = os.getenv("VOICE_TARGET", "Code")  # default: VS Code
+
+
+def type_text(text, submit=True, target_app=None):
+    """Type text into the target app via clipboard paste + AppleScript."""
+    target_process = target_app or TARGET_APP
+
+    if target_process not in ALLOWED_APPS:
+        print(f"Warning: target '{target_process}' not in allowed apps. Skipping.", flush=True)
         return
 
-    # Escape for AppleScript
-    escaped = text.replace("\\", "\\\\").replace('"', '\\"').replace("'", "\\'")
+    current_process = get_frontmost_app()
+    # Check both process name and resolved app name for match
+    target_app_name = app_name_for_activate(target_process)
+    current_app_name = app_name_for_activate(current_process)
+    switched = current_process != target_process and current_process not in PROCESS_TO_APP.get(target_process, {target_process})
 
-    script = f'tell application "System Events" to keystroke "{escaped}"'
+    # More robust switch detection: are we already in the target app?
+    # "Electron" and "Code" both map to VS Code
+    same_app = (current_process == target_process or
+                app_name_for_activate(current_process) == app_name_for_activate(target_process))
+    switched = not same_app
+
+    # Single AppleScript call: activate, paste, (enter), switch back
+    parts = []
+    if switched:
+        parts.append(f'tell application "{target_app_name}" to activate')
+        parts.append('delay 0.1')
+    if text:
+        subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
+        parts.append('tell application "System Events" to keystroke "v" using command down')
+    if submit:
+        parts.append('delay 0.1')
+        parts.append('tell application "System Events" to key code 36')
+    if switched:
+        parts.append('delay 0.1')
+        parts.append(f'tell application "{current_app_name}" to activate')
+
+    script = "\n".join(parts)
     try:
         subprocess.run(["osascript", "-e", script], check=True)
     except subprocess.CalledProcessError:
-        print("Error: osascript denied. Grant Accessibility access to Terminal/VS Code in System Settings → Privacy & Security → Accessibility", flush=True)
-        return
-
-    if submit:
-        time.sleep(0.1)
-        try:
-            subprocess.run(
-                [
-                    "osascript",
-                    "-e",
-                    'tell application "System Events" to key code 36',  # Enter key
-                ],
-                check=True,
-            )
-        except subprocess.CalledProcessError:
-            print("Error: could not press Enter", flush=True)
+        print("Error: osascript failed. Grant Accessibility access in System Settings → Privacy & Security → Accessibility", flush=True)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Voice input via local Whisper")
-    parser.add_argument(
-        "--auto",
-        action="store_true",
-        default=True,
-        help="Auto-detect silence (default)",
-    )
     parser.add_argument(
         "--hold", action="store_true", help="Hold-to-talk mode (Enter to start/stop)"
     )
@@ -249,6 +296,12 @@ def main():
     )
     parser.add_argument(
         "--loop", action="store_true", help="Keep listening in a loop"
+    )
+    parser.add_argument(
+        "--target",
+        type=str,
+        default=TARGET_APP,
+        help=f"Target app to type into (default: {TARGET_APP}, env: VOICE_TARGET)",
     )
     parser.add_argument(
         "--silence",
@@ -260,13 +313,14 @@ def main():
 
     print("Voice Input (Whisper STT)")
     print(f"Server: {STT_URL}")
+    print(f"Target: {args.target}")
     print(f"Mode: {'hold-to-talk' if args.hold else 'auto-silence'}")
 
-    # Calibrate to room noise
+    # Calibrate to room noise (typing floor is hardcoded in MIN_THRESHOLD)
     global SILENCE_THRESHOLD
     print("Calibrating ambient noise...", end=" ", flush=True)
     noise_level = calibrate_noise(duration=1.0)
-    SILENCE_THRESHOLD = max(SILENCE_THRESHOLD, noise_level * 2.5)
+    SILENCE_THRESHOLD = max(noise_level * NOISE_MULTIPLIER, MIN_THRESHOLD)
     print(f"noise={noise_level:.4f}, threshold={SILENCE_THRESHOLD:.4f}")
     print("---")
 
@@ -274,9 +328,13 @@ def main():
         try:
             # Wait while TTS is playing to avoid feedback loop
             if os.path.exists(TTS_LOCKFILE):
-                # Wait for TTS to finish
-                while os.path.exists(TTS_LOCKFILE):
+                waited = 0
+                while os.path.exists(TTS_LOCKFILE) and waited < TTS_WAIT_TIMEOUT:
                     time.sleep(0.2)
+                    waited += 0.2
+                if waited >= TTS_WAIT_TIMEOUT:
+                    print("(TTS lockfile stale, removing)", flush=True)
+                    os.remove(TTS_LOCKFILE)
                 # Cooldown: let room echo/reverb die before recording
                 time.sleep(1.5)
                 continue
@@ -303,22 +361,34 @@ def main():
                 # Check for spoken submit trigger at the end
                 text, triggered = check_submit_trigger(text)
                 submit = args.submit or triggered
-                print(f">>> {text}{'  [submit]' if submit else ''}")
-                type_text(text, submit=submit)
+                if text:
+                    print(f">>> {text}{'  [submit]' if submit else ''}")
+                    type_text(text, submit=submit, target_app=args.target)
+                elif submit:
+                    # Trigger word only (e.g. "submit") — just press Enter
+                    print(">>> [submit]")
+                    type_text("", submit=True, target_app=args.target)
                 # Cooldown after typing to avoid echo/reverb re-recording
                 time.sleep(1.0)
                 # After submit, wait for ALL TTS activity to settle
                 if submit:
                     print("(mic off — waiting for TTS)", flush=True)
                     time.sleep(2)  # wait for Claude to respond and hook to fire
-                    # Keep waiting while TTS is active, with quiet period check
-                    while True:
-                        while os.path.exists(TTS_LOCKFILE):
+                    # Keep waiting while TTS is active, with timeout
+                    waited = 0
+                    while waited < TTS_WAIT_TIMEOUT:
+                        while os.path.exists(TTS_LOCKFILE) and waited < TTS_WAIT_TIMEOUT:
                             time.sleep(0.2)
+                            waited += 0.2
                         # Wait 2s to see if another TTS starts
                         time.sleep(2)
+                        waited += 2
                         if not os.path.exists(TTS_LOCKFILE):
                             break  # no new TTS, safe to resume
+                    if waited >= TTS_WAIT_TIMEOUT:
+                        print("(TTS wait timed out, resuming)", flush=True)
+                        if os.path.exists(TTS_LOCKFILE):
+                            os.remove(TTS_LOCKFILE)
                     print("(mic on)", flush=True)
             else:
                 print("(no speech detected)")

@@ -21,6 +21,11 @@ You speak -> Whisper (STT) -> Claude Code -> [VOICE: tag] -> Kokoro (TTS) -> You
 - Interruptible — new responses cut off old audio
 - Smart summaries — Claude generates spoken summaries, not raw text dumps
 - Fallback mode — works even without the `[VOICE:]` tag (strips markdown, truncates)
+- Auto mic pause — mic stops during TTS playback, resumes after (no feedback loops)
+- Noise calibration — threshold adapts to your room at startup
+- Click filtering — ignores keyboard clicks, only triggers on sustained speech
+- Voice triggers — say "submit" to press Enter hands-free
+- App targeting — only types into Terminal, VS Code, iTerm2, Warp
 
 ## Requirements
 
@@ -101,20 +106,21 @@ Voquill is an open-source macOS speech input app that works system-wide. Best di
 
 **Option B: Whisper Voice Input (Best accuracy)**
 
-Uses your local Whisper server. Much better than macOS dictation for technical terms, code, and non-English languages. Runs as a background service in a separate terminal:
+Uses your local Whisper server. Much better than macOS dictation for technical terms, code, and non-English languages. Auto-pauses mic during TTS playback (no feedback loops), calibrates to room noise at startup. Runs as a background service in a separate terminal:
 
 ```bash
-# Start voice input (keeps listening, types text)
+# Start voice input (keeps listening, types text into VS Code)
 ./scripts/start-input-voice-whisper.sh
-
-# Say "submit", "send it", or "go ahead" at the end to press Enter
 
 # Options:
 ./scripts/start-input-voice-whisper.sh --submit      # always auto-press Enter
 ./scripts/start-input-voice-whisper.sh --silence 2.5  # adjust silence detection
+./scripts/start-input-voice-whisper.sh --target Terminal  # target a different app
 ```
 
-> Requires Accessibility permission for Terminal/VS Code (System Settings → Privacy & Security → Accessibility). One-time setup.
+> **Tip:** Say **"submit"**, **"send"**, **"send it"**, **"enter"**, or **"go ahead"** at the end of your sentence to auto-press Enter — no need for `--submit` flag.
+
+> Requires Accessibility permission (System Settings → Privacy & Security → Accessibility). One-time setup.
 > Only types into allowed apps (Terminal, VS Code, iTerm2, Warp) — won't send text to wrong windows.
 
 **Option C: macOS Dictation (Zero setup fallback)**
@@ -134,6 +140,7 @@ Environment variables to customize behavior:
 | `TTS_MODEL` | `prince-canuma/Kokoro-82M` | TTS model |
 | `STT_PORT` | `8000` | Whisper server port |
 | `WHISPER_MODEL` | `mlx-community/whisper-large-v3-turbo` | Whisper model |
+| `VOICE_TARGET` | `Code` | Target app for voice input (e.g. `Terminal`, `iTerm2`) |
 
 ## File Structure
 
@@ -190,7 +197,7 @@ Here's the full technical explanation with code...
 **Voice input picks up TTS audio (feedback loop):**
 - Auto-pause is built in — the mic automatically pauses while TTS is playing
 - If you still hear feedback, use headphones or lower speaker volume
-- Or run with `--no-submit` to review before sending: `python scripts/voice-input.py --loop --no-submit`
+- Default is type-only (no Enter) — review text before pressing Enter yourself
 
 ## Credits
 

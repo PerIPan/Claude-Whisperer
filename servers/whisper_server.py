@@ -37,15 +37,17 @@ def _serialize_transcribe(tmp_path, language):
         return mlx_whisper.transcribe(tmp_path, path_or_hf_repo=MODEL, language=language)
 
 async def do_transcribe(file, model, language, response_format):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
+    tmp_path = None
     try:
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, lambda: _serialize_transcribe(tmp_path, language))
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, lambda: _serialize_transcribe(tmp_path, language or None))
         text = result["text"]
     finally:
-        os.unlink(tmp_path)
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
     if response_format == "text":
         return text
     return JSONResponse({"text": text})
@@ -62,4 +64,4 @@ async def transcribe(
 
 if __name__ == "__main__":
     port = int(os.getenv("STT_PORT", "8000"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="127.0.0.1", port=port)
