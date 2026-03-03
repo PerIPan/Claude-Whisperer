@@ -60,17 +60,18 @@ fi
   MODEL="${TTS_MODEL:-prince-canuma/Kokoro-82M}"
   TMPFILE=$(mktemp /tmp/tts_XXXXXX.wav)
 
+  # Pause voice-input for entire TTS pipeline (generation + playback)
+  touch "$LOCKFILE"
+
   curl -s -X POST "$TTS_URL" \
     -H "Content-Type: application/json" \
     -d "$(jq -n --arg t "$SPEECH" --arg v "$VOICE" --arg m "$MODEL" '{model: $m, input: $t, voice: $v}')" \
     --output "$TMPFILE" 2>/dev/null
 
   if [ -s "$TMPFILE" ]; then
-    # Signal voice-input to pause listening during playback
-    touch "$LOCKFILE"
     afplay "$TMPFILE" 2>/dev/null
-    rm -f "$LOCKFILE"
   fi
+  rm -f "$LOCKFILE"
   rm -f "$TMPFILE" 2>/dev/null
   rm -f "$PIDFILE" 2>/dev/null
 ) &
