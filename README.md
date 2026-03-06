@@ -8,7 +8,27 @@ You use Claude Code normally. After every response, Claude's answer is automatic
 
 Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
-## 5-Minute Setup
+## Quick Install (DMG)
+
+Download `ClaudeWhisperer-1.0.0.dmg` from [Releases](https://github.com/PerIPan/Claude-Whisperer/releases), drag to Applications, and launch.
+
+On first launch, the app:
+- Creates a Python environment with all dependencies
+- Downloads MLX Whisper (~1.5GB) and Kokoro TTS (~300MB) models
+- Starts both servers automatically
+
+The menubar icon gives you:
+- Start/Stop/Restart servers
+- Claude Hook Setup instructions
+- Voquill Setup instructions
+- Get Voquill (download link)
+- View server logs
+
+After setup, use the **Claude Hook Setup** and **Voquill Setup** buttons in the menubar for configuration instructions.
+
+## Manual Setup (5 minutes)
+
+If you prefer running from source instead of the app:
 
 ### Prerequisites
 
@@ -157,9 +177,24 @@ Claude-Whisperer/
 ├── servers/
 │   ├── whisper_server.py # Whisper STT server (OpenAI-compatible)
 │   └── start-servers.sh  # Launches both servers
-└── scripts/
-    └── speak.sh          # Standalone TTS utility (pipe text to hear it)
+├── scripts/
+│   └── speak.sh          # Standalone TTS utility (pipe text to hear it)
+└── app/                   # macOS menubar app source (Swift)
+    ├── Package.swift
+    ├── Sources/
+    ├── Resources/
+    └── build-dmg.sh       # Build the .dmg yourself
 ```
+
+## Building the App from Source
+
+```bash
+cd app
+chmod +x build-dmg.sh
+./build-dmg.sh
+```
+
+Requires Xcode Command Line Tools. Produces `Claude Whisperer.app` and `ClaudeWhisperer-1.0.0.dmg` in `app/.build/`.
 
 ## Credits
 
