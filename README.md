@@ -19,7 +19,7 @@ You speak -> Whisper (STT) -> Claude Code -> [VOICE: tag] -> Kokoro (TTS) -> You
 - 100% local — no cloud APIs, no data leaves your Mac
 - Async playback — keep working while Claude speaks
 - Interruptible — new responses cut off old audio
-- Barge-in — press SPACE or just start speaking to interrupt TTS instantly
+- Barge-in — press SPACE to interrupt TTS instantly
 - Smart summaries — Claude generates spoken summaries, not raw text dumps
 - Fallback mode — works even without the `[VOICE:]` tag (strips markdown, truncates)
 - Auto mic pause — mic stops during TTS playback, resumes after (no feedback loops)
@@ -166,14 +166,7 @@ Press **fn fn** (fn key twice) to dictate. Works instantly, no extra scripts nee
 
 ## Barge-in
 
-When using the voice input script (Option B), you can interrupt Claude's TTS playback at any time — no need to wait for it to finish.
-
-**Two ways to barge in:**
-
-| Method | How | When |
-|--------|-----|------|
-| **Spacebar** | Press SPACE in the voice-input terminal | Any time TTS is playing |
-| **Voice** | Just start speaking | Mic detects your voice above the TTS threshold |
+When using the voice input script (Option B), you can interrupt Claude's TTS playback by pressing **SPACE** in the voice-input terminal — no need to wait for it to finish.
 
 **What happens:**
 1. TTS audio stops immediately (afplay is killed)
@@ -181,12 +174,7 @@ When using the voice input script (Option B), you can interrupt Claude's TTS pla
 3. Mic resumes with a short 0.5s cooldown (vs. normal 1.5s)
 4. You can start speaking your next request right away
 
-**Voice barge-in** uses a higher energy threshold than normal speech detection (8x noise floor vs. 4x) to avoid the TTS speaker audio triggering it. For best results:
-- Speak clearly and at a normal volume
-- If your speakers are very loud, voice barge-in may trigger from TTS output — use headphones or press SPACE instead
-- The spacebar method always works regardless of speaker volume
-
-> **Note:** Spacebar barge-in is not available in `--hold` mode (conflicts with Enter-based recording). Voice barge-in works in all modes.
+> **Note:** Spacebar barge-in is not available in `--hold` mode (conflicts with Enter-based recording).
 
 ## Voice Commands
 
@@ -297,8 +285,7 @@ Here's the full technical explanation with code...
 
 **Voice input picks up TTS audio (feedback loop):**
 - Auto-pause is built in — the mic automatically pauses while TTS is playing
-- Use barge-in (SPACE or just speak) to interrupt TTS and resume mic immediately
-- If voice barge-in triggers too easily from TTS speaker output, use headphones or lower speaker volume
+- Use barge-in (press SPACE) to interrupt TTS and resume mic immediately
 - Default is type-only (no Enter) — review text before pressing Enter yourself
 
 **Terminal stuck after crash (no echo, weird input):**

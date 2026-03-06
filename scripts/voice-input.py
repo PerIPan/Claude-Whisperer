@@ -37,9 +37,6 @@ NOISE_MULTIPLIER = 4.0  # threshold = noise_floor × this
 MIN_THRESHOLD = 0.01  # absolute minimum — above keyboard typing noise (~0.007)
 TTS_WAIT_TIMEOUT = 120  # max seconds to wait for TTS before resuming mic
 PIDFILE = "/tmp/tts_hook.pid"
-VOICE_BARGE_IN_MULTIPLIER = 8.0  # voice barge-in threshold = noise_floor × this (higher than speech detection)
-VOICE_BARGE_IN_CHUNKS = 3  # consecutive loud chunks (~300ms) to confirm voice barge-in
-
 # Global flag to signal barge-in from the keyboard listener thread
 _barge_in_event = threading.Event()
 
@@ -121,49 +118,6 @@ def _keypress_listener():
         pass
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, _original_term_settings)
-
-
-def _voice_barge_in_listener():
-    """Background thread: sample mic energy during TTS, auto-barge-in on voice."""
-    chunk_size = int(SAMPLE_RATE * 0.1)  # 100ms chunks
-    consecutive_loud = 0
-
-    while True:
-        try:
-            # Only listen when TTS is playing
-            if not os.path.exists(TTS_LOCKFILE):
-                consecutive_loud = 0
-                time.sleep(0.2)
-                continue
-
-            # Open a short mic stream to sample energy
-            stream = sd.InputStream(
-                samplerate=SAMPLE_RATE, channels=1, dtype="float32", blocksize=chunk_size,
-            )
-            stream.start()
-            try:
-                while os.path.exists(TTS_LOCKFILE):
-                    if _barge_in_event.is_set():
-                        break
-                    data, _ = stream.read(chunk_size)
-                    energy = np.sqrt(np.mean(data**2))
-                    voice_threshold = max(
-                        (SILENCE_THRESHOLD or MIN_THRESHOLD) * (VOICE_BARGE_IN_MULTIPLIER / NOISE_MULTIPLIER),
-                        MIN_THRESHOLD * 2,
-                    )
-                    if energy > voice_threshold:
-                        consecutive_loud += 1
-                        if consecutive_loud >= VOICE_BARGE_IN_CHUNKS:
-                            _do_barge_in("voice")
-                            consecutive_loud = 0
-                            break
-                    else:
-                        consecutive_loud = 0
-            finally:
-                stream.stop()
-                stream.close()
-        except Exception:
-            time.sleep(0.5)
 
 
 def _restore_terminal():
@@ -455,7 +409,7 @@ def main():
     print(f"Server: {STT_URL}")
     print(f"Target: {args.target}")
     print(f"Mode: {'hold-to-talk' if args.hold else 'auto-silence'}")
-    print("Barge-in: press SPACE or just start speaking to interrupt TTS")
+    print("Barge-in: press SPACE to interrupt TTS playback")
 
     # Calibrate to room noise (typing floor is hardcoded in MIN_THRESHOLD)
     global SILENCE_THRESHOLD
@@ -474,10 +428,6 @@ def main():
         atexit.register(_restore_terminal)
         barge_thread = threading.Thread(target=_keypress_listener, daemon=True)
         barge_thread.start()
-    # Voice-onset barge-in (works in all modes)
-    voice_barge_thread = threading.Thread(target=_voice_barge_in_listener, daemon=True)
-    voice_barge_thread.start()
-
     while True:
         try:
             _barge_in_event.clear()
