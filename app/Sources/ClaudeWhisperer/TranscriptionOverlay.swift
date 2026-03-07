@@ -60,7 +60,7 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
     private func startTailing() {
         stopTailing()
 
-        let logPath = Paths.sttLog.path
+        let logPath = Paths.serverLog.path
         guard FileManager.default.fileExists(atPath: logPath) else { return }
 
         guard let fh = FileHandle(forReadingAtPath: logPath) else { return }

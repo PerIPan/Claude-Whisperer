@@ -14,8 +14,9 @@ struct MenuBarView: View {
     @State private var hookApplied = false
     @State private var claudeMdApplied = false
     @State private var applyMessage = ""
-    @State private var ttsReachable = false
-    @State private var sttHasTraffic = false
+    @State private var serverReachable = false
+    @State private var hasTranscriptions = false
+    @State private var cleanMessage = ""
     @ObservedObject private var overlay = TranscriptionOverlay.shared
 
     private static let voices: [(id: String, label: String)] = [
@@ -83,11 +84,9 @@ struct MenuBarView: View {
                 }
                 .padding(.vertical, 4)
             } else {
-                // Server status
-                StatusRow(label: "Whisper STT", port: "\(serverManager.sttPort)", status: serverManager.sttStatus)
-                    .help("Speech-to-Text — converts your voice to text using MLX Whisper")
-                StatusRow(label: "Kokoro TTS", port: "\(serverManager.ttsPort)", status: serverManager.ttsStatus)
-                    .help("Text-to-Speech — reads Claude's responses aloud using Kokoro")
+                // Server status — single unified server
+                StatusRow(label: "Whisper STT", subtitle: serverManager.sttModel, port: "\(serverManager.port)", status: serverManager.status)
+                StatusRow(label: "Kokoro TTS", subtitle: serverManager.ttsModel, port: "\(serverManager.port)", status: serverManager.status)
             }
 
             Divider().opacity(0.4)
@@ -178,10 +177,9 @@ struct MenuBarView: View {
 
             Divider().opacity(0.4)
 
-            // Ports & Voice
-            let isStopped = serverManager.sttStatus == .stopped && serverManager.ttsStatus == .stopped
-            PortField(label: "STT Port", port: $serverManager.sttPort, disabled: !isStopped)
-            PortField(label: "TTS Port", port: $serverManager.ttsPort, disabled: !isStopped)
+            // Port & Voice
+            let isStopped = serverManager.status == .stopped
+            PortField(label: "Port", port: $serverManager.port, disabled: !isStopped)
 
             HStack {
                 Text("Voice")
@@ -203,12 +201,20 @@ struct MenuBarView: View {
 
             // Server controls
             HStack(spacing: 6) {
-                if isStopped {
+                if isStopped || serverManager.status == .error {
                     Button(action: { serverManager.startAll() }) {
-                        Label("Start Servers", systemImage: "play.fill")
+                        Label("Start Server", systemImage: "play.fill")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(MenuBarButtonStyle())
+
+                    if serverManager.status == .error {
+                        Button(action: { serverManager.restartAll() }) {
+                            Label("Restart", systemImage: "arrow.clockwise")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(MenuBarButtonStyle())
+                    }
                 } else {
                     Button(action: {
                         serverManager.stopAll()
@@ -231,7 +237,7 @@ struct MenuBarView: View {
             }
 
             if showStoppedBanner {
-                Text("Servers stopped")
+                Text("Server stopped")
                     .font(.custom("Outfit", size: 11))
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -296,7 +302,7 @@ struct MenuBarView: View {
             VStack(alignment: .leading, spacing: 2) {
                 DiagnosticRow(label: "Hook configured", ok: hookApplied)
                 DiagnosticRow(label: "Voice tag active", ok: claudeMdApplied)
-                DiagnosticRow(label: "TTS reachable", ok: ttsReachable)
+                DiagnosticRow(label: "Server reachable", ok: serverReachable)
             }
             .padding(.leading, 2)
 
@@ -305,7 +311,7 @@ struct MenuBarView: View {
             // Voquill
             SectionHeader(title: "Voquill Setup Instructions", icon: "mic")
 
-            Button(action: { ConfigManager.showVoquillInstructions(sttPort: serverManager.sttPort) }) {
+            Button(action: { ConfigManager.showVoquillInstructions(sttPort: serverManager.port) }) {
                 Label("Voquill Setup", systemImage: "mic.badge.plus")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -317,7 +323,7 @@ struct MenuBarView: View {
             }
             .buttonStyle(MenuBarRowButtonStyle())
 
-            if serverManager.sttStatus == .running && !sttHasTraffic {
+            if serverManager.status == .running && !hasTranscriptions {
                 Text("No speech received yet — is Voquill configured?")
                     .font(.custom("Outfit", size: 10))
                     .foregroundColor(.orange)
@@ -330,17 +336,29 @@ struct MenuBarView: View {
             SectionHeader(title: "Logs", icon: "doc.text.magnifyingglass")
 
             HStack(spacing: 6) {
-                Button(action: { ConfigManager.showLog(name: "Whisper STT", url: Paths.sttLog) }) {
-                    Label("STT", systemImage: "doc.text")
+                Button(action: { ConfigManager.showLog(name: "Server", url: Paths.serverLog) }) {
+                    Label("Server Log", systemImage: "doc.text")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(MenuBarRowButtonStyle())
 
-                Button(action: { ConfigManager.showLog(name: "Kokoro TTS", url: Paths.ttsLog) }) {
-                    Label("TTS", systemImage: "doc.text")
+                Button(action: {
+                    let count = ConfigManager.cleanTempFiles()
+                    cleanMessage = "Cleaned \(count) file\(count == 1 ? "" : "s")"
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { cleanMessage = "" }
+                }) {
+                    Label("Clean Temp", systemImage: "trash")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(MenuBarRowButtonStyle())
+                .help("Remove stale TTS temp files, locks, and PID files")
+            }
+
+            if !cleanMessage.isEmpty {
+                Text(cleanMessage)
+                    .font(.custom("Outfit", size: 10))
+                    .foregroundColor(.green)
+                    .transition(.opacity)
             }
 
             Toggle("Transcription Overlay", isOn: Binding(
@@ -404,9 +422,9 @@ struct MenuBarView: View {
     private func refreshDiagnostics() {
         hookApplied = ConfigManager.checkHookConfigured()
         claudeMdApplied = ConfigManager.checkClaudeMdConfigured()
-        sttHasTraffic = ConfigManager.sttHasReceivedRequests()
-        ConfigManager.testTTS(port: serverManager.ttsPort) { ok in
-            ttsReachable = ok
+        hasTranscriptions = ConfigManager.sttHasReceivedRequests()
+        ConfigManager.testTTS(port: serverManager.port) { ok in
+            serverReachable = ok
         }
     }
 
@@ -535,6 +553,7 @@ struct DiagnosticRow: View {
 
 struct StatusRow: View {
     let label: String
+    let subtitle: String
     let port: String
     let status: ServerManager.ServerStatus
 
@@ -546,6 +565,9 @@ struct StatusRow: View {
                 .shadow(color: statusColor.opacity(0.4), radius: status == .running ? 2 : 0)
             Text(label)
                 .font(.custom("Outfit", size: 13))
+            Text(subtitle)
+                .font(.custom("Outfit", size: 9))
+                .foregroundStyle(.tertiary)
             Spacer()
             Text(":\(port)")
                 .font(.custom("Outfit", size: 10))

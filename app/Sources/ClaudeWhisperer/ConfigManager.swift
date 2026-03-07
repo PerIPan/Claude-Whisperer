@@ -158,9 +158,16 @@ enum ConfigManager {
               let rawString = String(data: jsonData, encoding: .utf8) else {
             return (false, "Failed to serialize JSON")
         }
-        let jsonString = rawString.replacingOccurrences(
-            of: "    ", with: "  "
-        )
+        // Only replace leading indentation (not spaces inside string values)
+        let jsonString = rawString
+            .components(separatedBy: "\n")
+            .map { line in
+                let leading = line.prefix(while: { $0 == " " })
+                let rest = line.dropFirst(leading.count)
+                let halved = String(repeating: " ", count: leading.count / 2)
+                return halved + rest
+            }
+            .joined(separator: "\n")
 
         do {
             try jsonString.write(to: Paths.claudeSettings, atomically: true, encoding: .utf8)
@@ -248,7 +255,7 @@ enum ConfigManager {
     }
 
     static func sttHasReceivedRequests() -> Bool {
-        guard let handle = try? FileHandle(forReadingFrom: Paths.sttLog) else { return false }
+        guard let handle = try? FileHandle(forReadingFrom: Paths.serverLog) else { return false }
         defer { handle.closeFile() }
         let size = handle.seekToEndOfFile()
         let start: UInt64 = size > 16384 ? size - 16384 : 0
@@ -256,6 +263,42 @@ enum ConfigManager {
         let data = handle.readDataToEndOfFile()
         guard let text = String(data: data, encoding: .utf8) else { return false }
         return text.contains("POST /v1/audio/transcriptions") || text.contains("Transcribed:")
+    }
+
+    // MARK: - Clean Temp Files
+
+    /// Remove stale TTS temp files, lock files, and PID files. Returns count of files removed.
+    static func cleanTempFiles() -> Int {
+        let fm = FileManager.default
+        var count = 0
+
+        // Clean TTS temp dir: ~/tmp or $TMPDIR/claude-tts-<uid>
+        let uid = getuid()
+        let tmpBase = NSTemporaryDirectory()
+        let ttsTmpDir = (tmpBase as NSString).appendingPathComponent("claude-tts-\(uid)")
+        if let files = try? fm.contentsOfDirectory(atPath: ttsTmpDir) {
+            for file in files where file.hasPrefix("tts_") && file.hasSuffix(".wav") {
+                try? fm.removeItem(atPath: (ttsTmpDir as NSString).appendingPathComponent(file))
+                count += 1
+            }
+        }
+
+        // Clean lock/pid files in app support (includes legacy two-server artifacts)
+        let cleanFiles = [
+            Paths.appSupport.appendingPathComponent("tts_hook.pid"),
+            Paths.appSupport.appendingPathComponent("tts_playing.lock"),
+            Paths.appSupport.appendingPathComponent("tts_hook.lock"),
+            Paths.appSupport.appendingPathComponent("whisper.pid"),
+            Paths.appSupport.appendingPathComponent("tts.pid"),
+        ]
+        for url in cleanFiles {
+            if fm.fileExists(atPath: url.path) {
+                try? fm.removeItem(at: url)
+                count += 1
+            }
+        }
+
+        return count
     }
 
     // MARK: - View Logs (individual)

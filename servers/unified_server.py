@@ -1,0 +1,269 @@
+"""Unified MLX Audio server — TTS + STT with auto-submit, auto-focus, barge-in."""
+
+import asyncio
+import logging
+import os
+import re
+import signal
+import subprocess
+import tempfile
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+
+import mlx_whisper
+import uvicorn
+from fastapi import File, Form, UploadFile
+from fastapi.responses import JSONResponse, PlainTextResponse
+
+# Import the mlx_audio server app (includes TTS + /v1/models + WebSocket STT)
+from mlx_audio.server import app, setup_cors
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger("unified_server")
+
+# ---------------------------------------------------------------------------
+# Remove mlx_audio's built-in /v1/audio/transcriptions so we can replace it
+# with our version that adds auto-submit, barge-in, etc.
+# ---------------------------------------------------------------------------
+_original_count = len(app.routes)
+_override_paths = {"/v1/audio/transcriptions", "/v1/models"}
+app.routes[:] = [
+    r for r in app.routes
+    if not (hasattr(r, "path") and r.path in _override_paths
+            and hasattr(r, "methods")
+            and (("POST" in (r.methods or set()) and r.path == "/v1/audio/transcriptions")
+                 or ("GET" in (r.methods or set()) and r.path == "/v1/models")))
+]
+_removed = _original_count - len(app.routes)
+if _removed == 0:
+    logger.warning(
+        "Could not find mlx_audio routes to override. "
+        "The mlx_audio library may have changed its route structure."
+    )
+
+# Reconfigure CORS for localhost
+setup_cors(app, [
+    "http://localhost:8000", "http://127.0.0.1:8000",
+    "http://localhost:3000", "http://127.0.0.1:3000",
+])
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "mlx-community/whisper-large-v3-turbo")
+TTS_MODEL = os.getenv("TTS_MODEL", "prince-canuma/Kokoro-82M")
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100MB
+
+_APP_SUPPORT = os.path.expanduser("~/Library/Application Support/ClaudeWhisperer")
+AUTO_SUBMIT_FLAG = os.path.join(_APP_SUPPORT, "auto_submit")
+AUTO_FOCUS_APP = os.path.join(_APP_SUPPORT, "auto_focus_app")
+TTS_PIDFILE = os.path.join(_APP_SUPPORT, "tts_hook.pid")
+TTS_LOCKFILE = os.path.join(_APP_SUPPORT, "tts_playing.lock")
+
+SUBMIT_TRIGGERS = sorted(
+    ["submit", "send it", "go ahead", "send", "enter"],
+    key=len, reverse=True,
+)
+
+_ALLOWED_FOCUS_APPS = {
+    "Code", "Code - Insiders", "Cursor", "Windsurf",
+    "Terminal", "iTerm2", "Warp", "Alacritty", "Ghostty",
+}
+
+_transcribe_lock = threading.Lock()
+_transcribe_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="transcribe")
+_pending_enter_task: asyncio.Task | None = None
+_enter_lock = asyncio.Lock()
+
+# ---------------------------------------------------------------------------
+# STT helpers (auto-submit, auto-focus, barge-in)
+# ---------------------------------------------------------------------------
+
+def _serialize_transcribe(tmp_path, language):
+    with _transcribe_lock:
+        return mlx_whisper.transcribe(tmp_path, path_or_hf_repo=WHISPER_MODEL, language=language)
+
+
+def check_submit_trigger(text):
+    lower = text.lower().rstrip(" .,!?")
+    for trigger in SUBMIT_TRIGGERS:
+        if lower.endswith(trigger):
+            if " " in trigger:
+                pattern = r'\s*' + re.escape(trigger) + r'[.!?,]?$'
+            else:
+                pattern = r'\s*\b' + re.escape(trigger) + r'[.!?,]?$'
+            cleaned = re.sub(pattern, '', text.strip(), flags=re.IGNORECASE)
+            return cleaned, True
+    return text, False
+
+
+def focus_target_app():
+    try:
+        if not os.path.exists(AUTO_FOCUS_APP):
+            return
+        with open(AUTO_FOCUS_APP) as f:
+            app_name = f.read().strip()
+        if not app_name:
+            return
+        if app_name not in _ALLOWED_FOCUS_APPS:
+            if not re.match(r'^[A-Za-z0-9 ._-]+$', app_name):
+                logger.warning("Blocked suspicious auto-focus app name: %r", app_name)
+                return
+        subprocess.Popen(
+            ["osascript", "-e", f'tell application "{app_name}" to activate'],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        logger.exception("focus_target_app failed")
+
+
+def kill_tts():
+    try:
+        try:
+            with open(TTS_PIDFILE) as f:
+                pid = int(f.read().strip())
+            if pid > 0:
+                try:
+                    result = subprocess.run(
+                        ["ps", "-p", str(pid), "-o", "comm="],
+                        capture_output=True, text=True, timeout=2,
+                    )
+                    comm = result.stdout.strip()
+                    if comm and ("afplay" in comm or "tts" in comm or "bash" in comm):
+                        os.kill(pid, signal.SIGTERM)
+                except (subprocess.TimeoutExpired, ProcessLookupError, PermissionError):
+                    pass
+        except (FileNotFoundError, ValueError):
+            pass
+
+        subprocess.run(
+            ["pkill", "-INT", "-U", str(os.getuid()), "-f", "afplay.*tts_"],
+            capture_output=True, timeout=2,
+        )
+        time.sleep(0.15)
+        subprocess.run(
+            ["pkill", "-U", str(os.getuid()), "-f", "afplay.*tts_"],
+            capture_output=True, timeout=2,
+        )
+
+        for path in (TTS_PIDFILE, TTS_LOCKFILE):
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                pass
+    except Exception:
+        logger.exception("kill_tts failed")
+
+
+def press_cmd_enter():
+    try:
+        subprocess.Popen(
+            ["osascript", "-e", 'tell application "System Events" to key code 36 using command down'],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        logger.exception("press_cmd_enter failed")
+
+
+async def _delayed_enter():
+    await asyncio.sleep(0.3)
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, press_cmd_enter)
+
+
+# ---------------------------------------------------------------------------
+# Custom STT endpoint (replaces mlx_audio's built-in)
+# ---------------------------------------------------------------------------
+
+@app.post("/v1/audio/transcriptions")
+@app.post("/audio/transcriptions")
+async def transcribe(
+    file: UploadFile = File(...),
+    model: str = Form(default="whisper-1"),
+    language: str = Form(default=None),
+    response_format: str = Form(default="json"),
+):
+    tmp_path = None
+    try:
+        chunks = []
+        total = 0
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_UPLOAD_BYTES:
+                return JSONResponse({"error": "File too large (max 100MB)"}, status_code=413)
+            chunks.append(chunk)
+        data = b"".join(chunks)
+
+        ext = ".wav"
+        if file.filename:
+            _, file_ext = os.path.splitext(file.filename)
+            if file_ext:
+                ext = file_ext
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            _transcribe_executor,
+            lambda p=tmp_path, l=language: _serialize_transcribe(p, l or None),
+        )
+        text = result.get("text", "")
+        if text.strip():
+            logger.info("Transcribed: %s", text.strip())
+    except Exception:
+        logger.exception("Transcription failed")
+        return JSONResponse({"error": "Transcription failed"}, status_code=500)
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except FileNotFoundError:
+                pass
+
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, focus_target_app)
+
+    should_submit = False
+    if os.path.exists(AUTO_SUBMIT_FLAG):
+        text, should_submit = check_submit_trigger(text)
+
+    if should_submit:
+        global _pending_enter_task
+        async with _enter_lock:
+            if _pending_enter_task and not _pending_enter_task.done():
+                _pending_enter_task.cancel()
+            await loop.run_in_executor(None, kill_tts)
+            _pending_enter_task = asyncio.create_task(_delayed_enter())
+
+    if response_format == "text":
+        return PlainTextResponse(text)
+    return JSONResponse({"text": text})
+
+
+# ---------------------------------------------------------------------------
+# Models endpoint — lists both STT and TTS models
+# ---------------------------------------------------------------------------
+@app.get("/v1/models")
+@app.get("/models")
+async def list_models():
+    return {
+        "object": "list",
+        "data": [
+            {"id": WHISPER_MODEL, "object": "model", "owned_by": "local", "type": "stt"},
+            {"id": TTS_MODEL, "object": "model", "owned_by": "local", "type": "tts"},
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    port = int(os.getenv("SERVER_PORT", "8000"))
+    uvicorn.run(app, host="127.0.0.1", port=port, workers=1)

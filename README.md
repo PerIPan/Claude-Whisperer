@@ -19,17 +19,17 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 On first launch, the app:
 - Creates a Python environment with all dependencies
 - Downloads MLX Whisper (~1.5GB) and Kokoro TTS (~300MB) models
-- Starts both servers automatically
+- Starts the unified server automatically
 
 The menubar icon gives you:
-- Start/Stop/Restart servers with configurable ports
+- Start/Stop/Restart server with configurable port
 - **Voice picker** — choose from 8 Kokoro voices (no server restart needed)
 - **Automation** — Auto-Submit and Auto-Focus (requires Accessibility permission)
 - **Auto-Apply** — one-click setup for Claude hook (settings.json) and voice tag (CLAUDE.md)
 - **Diagnostic checklist** — shows hook, voice tag, and TTS status at a glance
 - **Transcription overlay** — floating window showing live speech-to-text output
 - Voquill Setup + download link (with detection hint if no speech received)
-- Separate STT and TTS logs (STT log includes transcribed text)
+- Unified server log (STT + TTS on single port, includes transcribed text)
 
 After setup, use the menubar buttons for configuration instructions.
 
@@ -99,16 +99,16 @@ Here's the full code with detailed explanation...
 
 | Variable | Default | Used by | Description |
 |----------|---------|---------|-------------|
-| `TTS_URL` | `http://localhost:8100/v1/audio/speech` | tts-hook.sh | TTS server endpoint |
+| `TTS_URL` | `http://localhost:8000/v1/audio/speech` | tts-hook.sh | Unified server TTS endpoint |
 | `TTS_VOICE` | `af_heart` | tts-hook.sh | Kokoro voice name |
 | `TTS_MODEL` | `prince-canuma/Kokoro-82M` | tts-hook.sh | TTS model |
-| `STT_PORT` | `8000` | whisper_server.py | Whisper server port |
-| `WHISPER_MODEL` | `mlx-community/whisper-large-v3-turbo` | whisper_server.py | Whisper model |
+| `SERVER_PORT` | `8000` | unified_server.py | Server port |
+| `WHISPER_MODEL` | `mlx-community/whisper-large-v3-turbo` | unified_server.py | Whisper model |
 
 ## Troubleshooting
 
 **No audio after Claude responds:**
-1. Check TTS server is running: `curl http://localhost:8100/models`
+1. Check TTS server is running: `curl http://localhost:8000/models`
 2. Test TTS directly: `echo "hello" | ./scripts/speak.sh`
 3. Check the hook path in `settings.json` is correct and absolute
 
@@ -158,9 +158,8 @@ This creates a Python venv at `~/mlx-openai-whisper` and installs everything (ML
 ./servers/start-servers.sh
 ```
 
-Two servers start:
-- `localhost:8000` — Whisper STT (speech-to-text)
-- `localhost:8100` — Kokoro TTS (text-to-speech)
+One unified server starts on:
+- `localhost:8000` — Whisper STT + Kokoro TTS (both on one port)
 
 Keep this terminal open while using Claude.
 
@@ -217,8 +216,8 @@ Claude-Whisperer/
 ├── hooks/
 │   └── tts-hook.sh       # Claude Code hook — speaks responses via TTS
 ├── servers/
-│   ├── whisper_server.py # Whisper STT server (OpenAI-compatible, auto-submit)
-│   └── start-servers.sh  # Launches both servers
+│   ├── unified_server.py # Unified STT+TTS server (single port, auto-submit)
+│   └── start-servers.sh  # Launches the server
 ├── scripts/
 │   └── speak.sh          # Standalone TTS utility (pipe text to hear it)
 └── app/                   # macOS menubar app source (Swift)

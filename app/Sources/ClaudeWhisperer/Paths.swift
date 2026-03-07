@@ -24,9 +24,9 @@ enum Paths {
         resources.appendingPathComponent("uv")
     }
 
-    /// Bundled server scripts
-    static var whisperServer: URL {
-        resources.appendingPathComponent("servers").appendingPathComponent("whisper_server.py")
+    /// Unified server script (TTS + STT in one process)
+    static var unifiedServer: URL {
+        resources.appendingPathComponent("servers").appendingPathComponent("unified_server.py")
     }
 
     /// Bundled hook script
@@ -42,19 +42,17 @@ enum Paths {
     /// Setup marker file
     static let setupComplete = appSupport.appendingPathComponent(".setup-complete")
 
-    /// Server PID files
-    static let sttPidFile = appSupport.appendingPathComponent("whisper.pid")
-    static let ttsPidFile = appSupport.appendingPathComponent("tts.pid")
+    /// Server PID file (single unified server)
+    static let serverPidFile = appSupport.appendingPathComponent("server.pid")
 
-    /// Log files
-    static let sttLog = appSupport.appendingPathComponent("whisper.log")
-    static let ttsLog = appSupport.appendingPathComponent("tts.log")
+    /// Log file (single unified server)
+    static let serverLog = appSupport.appendingPathComponent("server.log")
     static let setupLog = appSupport.appendingPathComponent("setup.log")
 
-    /// Auto-submit flag file (whisper_server.py checks this)
+    /// Auto-submit flag file (unified_server.py checks this)
     static let autoSubmitFlag = appSupport.appendingPathComponent("auto_submit")
 
-    /// Auto-focus app file (whisper_server.py reads target app name from this)
+    /// Auto-focus app file (unified_server.py reads target app name from this)
     static let autoFocusApp = appSupport.appendingPathComponent("auto_focus_app")
 
     /// TTS voice file (tts-hook.sh reads voice name from this)

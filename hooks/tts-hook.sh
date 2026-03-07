@@ -90,13 +90,13 @@ touch "$LOCKFILE"
 
 # Fast-fail: check if TTS server is reachable (2s timeout)
 # Prevents 30s+ mic block when server is down
-TTS_URL="${TTS_URL:-http://localhost:8100/v1/audio/speech}"
+TTS_URL="${TTS_URL:-http://localhost:8000/v1/audio/speech}"
 # Validate TTS_URL points to localhost
 case "$TTS_URL" in
   http://localhost:*|http://127.0.0.1:*) ;;
   *)
     echo "WARNING: TTS_URL points to non-local host, using default" >&2
-    TTS_URL="http://localhost:8100/v1/audio/speech"
+    TTS_URL="http://localhost:8000/v1/audio/speech"
     ;;
 esac
 

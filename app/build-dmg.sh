@@ -40,7 +40,7 @@ cp "$SCRIPT_DIR/Resources/Outfit-VariableFont_wght.ttf" "$APP_BUNDLE/Contents/Re
 
 # Step 3: Bundle project scripts
 cp "$PROJECT_DIR/hooks/tts-hook.sh" "$APP_BUNDLE/Contents/Resources/hooks/"
-cp "$PROJECT_DIR/servers/whisper_server.py" "$APP_BUNDLE/Contents/Resources/servers/"
+cp "$PROJECT_DIR/servers/unified_server.py" "$APP_BUNDLE/Contents/Resources/servers/"
 cp "$PROJECT_DIR/scripts/speak.sh" "$APP_BUNDLE/Contents/Resources/scripts/"
 
 # Make scripts executable
