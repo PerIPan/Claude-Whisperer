@@ -184,7 +184,7 @@ class InstructionWindow: NSObject, NSWindowDelegate {
             ))
             w.contentView = hostingView
             w.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            NSApp.activate()
 
             self.window = w
         }

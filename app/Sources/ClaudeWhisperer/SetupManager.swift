@@ -11,6 +11,7 @@ class SetupManager: ObservableObject {
 
     @Published var state: SetupState = .notStarted
     @Published var progress: Double = 0
+    private var isSetupRunning = false
 
     var isSetupComplete: Bool {
         FileManager.default.fileExists(atPath: Paths.setupComplete.path)
@@ -22,6 +23,8 @@ class SetupManager: ObservableObject {
             completion(true)
             return
         }
+        guard !isSetupRunning else { return }
+        isSetupRunning = true
 
         Paths.ensureDirectories()
 
@@ -35,7 +38,10 @@ class SetupManager: ObservableObject {
                 step: "Creating Python environment..."
             ) == true else {
                 self?.updateState(.failed("Failed to create Python venv"), progress: 0)
-                DispatchQueue.main.async { completion(false) }
+                DispatchQueue.main.async {
+                    self?.isSetupRunning = false
+                    completion(false)
+                }
                 return
             }
 
@@ -43,7 +49,10 @@ class SetupManager: ObservableObject {
             self?.updateState(.inProgress("Installing MLX Audio (TTS)..."), progress: 0.2)
             guard self?.uvPipInstall("mlx-audio") == true else {
                 self?.updateState(.failed("Failed to install mlx-audio"), progress: 0)
-                DispatchQueue.main.async { completion(false) }
+                DispatchQueue.main.async {
+                    self?.isSetupRunning = false
+                    completion(false)
+                }
                 return
             }
 
@@ -51,7 +60,10 @@ class SetupManager: ObservableObject {
             self?.updateState(.inProgress("Installing MLX Whisper (STT)..."), progress: 0.4)
             guard self?.uvPipInstall("mlx-whisper") == true else {
                 self?.updateState(.failed("Failed to install mlx-whisper"), progress: 0)
-                DispatchQueue.main.async { completion(false) }
+                DispatchQueue.main.async {
+                    self?.isSetupRunning = false
+                    completion(false)
+                }
                 return
             }
 
@@ -61,7 +73,10 @@ class SetupManager: ObservableObject {
                 "en_core_web_sm@https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
             ) == true else {
                 self?.updateState(.failed("Failed to install spaCy model"), progress: 0)
-                DispatchQueue.main.async { completion(false) }
+                DispatchQueue.main.async {
+                    self?.isSetupRunning = false
+                    completion(false)
+                }
                 return
             }
 
@@ -77,7 +92,10 @@ class SetupManager: ObservableObject {
             try? "done".write(to: Paths.setupComplete, atomically: true, encoding: .utf8)
 
             self?.updateState(.complete, progress: 1.0)
-            DispatchQueue.main.async { completion(true) }
+            DispatchQueue.main.async {
+                self?.isSetupRunning = false
+                completion(true)
+            }
         }
     }
 

@@ -8,6 +8,7 @@ struct MenuBarView: View {
     @State private var focusAppName = ""
     @State private var focusSelection = "Code"  // visual default; only written on explicit toggle
     @State private var customFocusApp = ""
+    @State private var saveDebounce: DispatchWorkItem?
 
     private static let focusApps = [
         "Code",
@@ -134,7 +135,7 @@ struct MenuBarView: View {
                         .onChange(of: customFocusApp) { _, newValue in
                             if !newValue.isEmpty {
                                 focusAppName = newValue
-                                saveFocusApp()
+                                debouncedSaveFocusApp()
                             }
                         }
                 }
@@ -248,6 +249,13 @@ struct MenuBarView: View {
         try? focusAppName.write(to: Paths.autoFocusApp, atomically: true, encoding: .utf8)
     }
 
+    private func debouncedSaveFocusApp() {
+        saveDebounce?.cancel()
+        let work = DispatchWorkItem { saveFocusApp() }
+        saveDebounce = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+    }
+
     private func showStoppedAlert() {
         let alert = NSAlert()
         alert.messageText = "Servers Stopped"
@@ -276,7 +284,7 @@ struct PortField: View {
                 .opacity(disabled ? 0.6 : 1.0)
                 .onAppear { text = "\(port)" }
                 .onChange(of: text) { _, newValue in
-                    if let p = Int(newValue), p > 0, p <= 65535 {
+                    if let p = Int(newValue), p >= 1024, p <= 65535 {
                         port = p
                     }
                 }
