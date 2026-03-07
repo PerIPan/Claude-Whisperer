@@ -7,6 +7,17 @@
 PIDFILE="/tmp/tts_hook.pid"
 LOCKFILE="/tmp/tts_playing.lock"
 
+# Find jq: system PATH first, then bundled in app
+if ! command -v jq &>/dev/null; then
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  BUNDLED_JQ="$(dirname "$SCRIPT_DIR")/jq"
+  if [ -x "$BUNDLED_JQ" ]; then
+    export PATH="$(dirname "$BUNDLED_JQ"):$PATH"
+  else
+    exit 0  # no jq available, skip TTS
+  fi
+fi
+
 # Kill any previous TTS playback (check process is alive before killing)
 if [ -f "$PIDFILE" ]; then
   OLD_PID=$(cat "$PIDFILE")

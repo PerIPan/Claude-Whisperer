@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icon.png" width="128" height="128" alt="Claude Whisperer">
+</p>
+
 # Claude Whisperer
 
 Voice mode for [Claude Code](https://claude.ai/claude-code) on Apple Silicon. Talk to Claude, hear Claude talk back — all running locally on your Mac.
@@ -10,7 +14,7 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ## Install
 
-[**Download ClaudeWhisperer-1.0.0.dmg**](https://github.com/PerIPan/Claude-Whisperer/releases/download/v1.0.0/ClaudeWhisperer-1.0.0.dmg) — drag to Applications and launch.
+[**Download ClaudeWhisperer-1.1.0.dmg**](https://github.com/PerIPan/Claude-Whisperer/releases/download/v1.1.0/ClaudeWhisperer-1.1.0.dmg) — drag to Applications and launch.
 
 On first launch, the app:
 - Creates a Python environment with all dependencies
@@ -18,13 +22,13 @@ On first launch, the app:
 - Starts both servers automatically
 
 The menubar icon gives you:
-- Start/Stop/Restart servers
-- Claude Hook Setup instructions
-- Voquill Setup instructions
-- Get Voquill (download link)
-- View server logs
+- Start/Stop/Restart servers with configurable ports
+- **Automation** — Auto-Submit and Auto-Focus (requires Accessibility permission)
+- Claude Hook Setup (settings.json + CLAUDE.md — one button per step)
+- Voquill Setup + download link
+- Separate STT and TTS logs
 
-After setup, use the **Claude Hook Setup** and **Voquill Setup** buttons in the menubar for configuration instructions.
+After setup, use the menubar buttons for configuration instructions.
 
 ## Speech Input with Voquill
 
@@ -36,11 +40,29 @@ To talk *to* Claude (not just hear it), use [Voquill](https://github.com/nicobai
 2. Open Voquill → **Settings** → **Transcription**
 3. Set mode: **OpenAI Compatible API**
 4. Endpoint URL: `http://localhost:8000`
-5. Model: `whisper-1`
-6. API key: any value (e.g. `sk-local`) — the local server doesn't check it
+5. Model: `whisper`
+6. API key: `whisper`
 7. Language: `en` (or your preferred language)
 
 **Test it:** Speak into Voquill. You should see `POST /v1/audio/transcriptions` in the server terminal.
+
+### Automation
+
+Both features are in the **Automation** section of the menubar and require **Accessibility permission** (macOS will prompt you on first use).
+
+#### Auto-Submit
+
+Enable **Auto-Submit** to submit messages by voice. Say one of these trigger words at the end of your phrase:
+
+- "submit", "send", "send it", "go ahead", "enter"
+
+Example: *"fix the login bug, submit"* → types "fix the login bug" and presses Cmd+Enter.
+
+#### Auto-Focus
+
+Enable **Auto-Focus** to automatically bring a specific app to the front when you finish speaking. Pick from the dropdown (VS Code, Cursor, Windsurf, Terminal, iTerm2, Warp, Alacritty) or select **Custom** to type any app name.
+
+This is useful when you're speaking into Voquill from another window — the transcribed text will be typed into the focused target app.
 
 ### Why Voquill + Local Whisper?
 
@@ -82,16 +104,14 @@ Here's the full code with detailed explanation...
 
 **No audio after Claude responds:**
 1. Check TTS server is running: `curl http://localhost:8100/models`
-2. Check `jq` is installed: `which jq`
-3. Test TTS directly: `echo "hello" | ./scripts/speak.sh`
-4. Check the hook path in `settings.json` is correct and absolute
+2. Test TTS directly: `echo "hello" | ./scripts/speak.sh`
+3. Check the hook path in `settings.json` is correct and absolute
 
 **Voquill not transcribing:**
 1. Check Whisper server is running: `curl http://localhost:8000/models`
 2. Verify Voquill mode is **OpenAI Compatible API**
 3. Verify endpoint is `http://localhost:8000`
-4. Model should be `whisper-1`
-5. API key can be any non-empty string
+4. Model: `whisper`, API key: `whisper`
 
 **422 error from TTS:**
 - Make sure `model` field is included in requests
@@ -101,14 +121,21 @@ Here's the full code with detailed explanation...
 
 ## Manual Setup (from source)
 
-If you prefer running from source instead of the app:
+> **Tip:** You can ask your AI assistant (Claude, ChatGPT, etc.) to run these steps for you. Just paste the section below into your AI chat.
 
 ### Prerequisites
 
 - Mac with Apple Silicon (M1/M2/M3/M4)
 - [Claude Code](https://claude.ai/claude-code) (CLI or VS Code extension)
 - [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- [jq](https://jqlang.github.io/jq/) (`brew install jq`)
+- [jq](https://jqlang.github.io/jq/) — install with one of:
+  ```bash
+  # Option A: Direct download (no package manager needed)
+  curl -L -o /usr/local/bin/jq https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-macos-arm64 && chmod +x /usr/local/bin/jq
+
+  # Option B: Homebrew (if you have it)
+  brew install jq
+  ```
 
 ### Step 1: Install
 
@@ -185,7 +212,7 @@ Claude-Whisperer/
 ├── hooks/
 │   └── tts-hook.sh       # Claude Code hook — speaks responses via TTS
 ├── servers/
-│   ├── whisper_server.py # Whisper STT server (OpenAI-compatible)
+│   ├── whisper_server.py # Whisper STT server (OpenAI-compatible, auto-submit)
 │   └── start-servers.sh  # Launches both servers
 ├── scripts/
 │   └── speak.sh          # Standalone TTS utility (pipe text to hear it)

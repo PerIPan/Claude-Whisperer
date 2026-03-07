@@ -3,17 +3,19 @@ import SwiftUI
 
 enum ConfigManager {
 
-    // MARK: - Claude Code Hook Instructions
+    // MARK: - Claude Code: settings.json
 
-    static func showClaudeHookInstructions() {
+    static func showClaudeSettingsInstructions() {
         let hookPath = Paths.ttsHook.path
         let window = InstructionWindow(
-            title: "Configure Claude Code Hook",
+            title: "Step 1: Claude Code Hook (settings.json)",
             instructions: """
-            Add this to your Claude Code settings:
+            Add the TTS hook to your Claude Code settings:
 
-            1. Open ~/.claude/settings.json (or project .claude/settings.json)
-            2. Add the following under "hooks":
+            1. Open ~/.claude/settings.json
+               (or your project's .claude/settings.json)
+
+            2. Add the following:
 
             {
               "hooks": {
@@ -27,10 +29,35 @@ enum ConfigManager {
               }
             }
 
-            3. Also add the [VOICE: ...] instruction to your project's CLAUDE.md:
+            This makes Claude speak every response aloud.
+            """
+        )
+        window.show()
+    }
 
-            ALWAYS include a [VOICE: ...] tag at the END of every response.
-            This tag contains a short spoken summary that TTS reads aloud.
+    // MARK: - Claude Code: CLAUDE.md
+
+    static func showClaudeMdInstructions() {
+        let window = InstructionWindow(
+            title: "Step 2: CLAUDE.md (Voice Tag)",
+            instructions: """
+            Add this to your project's CLAUDE.md file:
+
+            ## Voice Mode
+            ALWAYS include a [VOICE: ...] tag at the END
+            of every response. This tag contains a short,
+            conversational spoken summary (1-3 sentences)
+            that the TTS hook extracts and reads aloud.
+
+            Write the voice content as natural speech -
+            no code, no file paths, no markdown.
+
+            Example:
+            [VOICE: I fixed the bug in the login page.
+            It was a missing null check on the user object.]
+
+            This tells Claude to add a spoken summary
+            to every response.
             """
         )
         window.show()
@@ -38,7 +65,7 @@ enum ConfigManager {
 
     // MARK: - Voquill Instructions
 
-    static func showVoquillInstructions() {
+    static func showVoquillInstructions(sttPort: Int) {
         let window = InstructionWindow(
             title: "Configure Voquill",
             instructions: """
@@ -48,12 +75,13 @@ enum ConfigManager {
             2. Select "OpenAI Compatible API" mode
             3. Set these values:
 
-               Endpoint:  http://localhost:8000
-               Model:     whisper-1
-               API Key:   any-value (required but not checked)
+               Endpoint:  http://localhost:\(sttPort)
+               Model:     whisper
+               API Key:   whisper
                Language:  en
 
-            4. Make sure the Whisper server is running (green dot in menubar)
+            4. Make sure the Whisper server is running
+               (green dot in menubar)
 
             Voquill will now use your local Whisper for
             high-accuracy, private transcription.
@@ -61,6 +89,7 @@ enum ConfigManager {
         )
         window.show()
     }
+
     // MARK: - Voquill Download
 
     static func showVoquillDownload() {
@@ -83,32 +112,32 @@ enum ConfigManager {
         window.show()
     }
 
-    // MARK: - View Logs
+    // MARK: - View Logs (individual)
 
-    static func showLogs() {
-        let logFiles: [(String, URL)] = [
-            ("Whisper STT", Paths.sttLog),
-            ("Kokoro TTS", Paths.ttsLog),
-            ("Setup", Paths.setupLog)
-        ]
-
-        var combined = ""
-        for (name, url) in logFiles {
-            combined += "=== \(name) Log ===\n"
-            if let content = try? String(contentsOf: url, encoding: .utf8) {
-                // Show last 50 lines
-                let lines = content.components(separatedBy: "\n")
-                let tail = lines.suffix(50).joined(separator: "\n")
-                combined += tail.isEmpty ? "(empty)\n" : tail + "\n"
+    static func showLog(name: String, url: URL) {
+        // Read only last 32KB to avoid memory spike on large logs (BUG-16)
+        var content = ""
+        if let fileHandle = try? FileHandle(forReadingFrom: url) {
+            defer { fileHandle.closeFile() }
+            let fileSize = fileHandle.seekToEndOfFile()
+            let readStart: UInt64 = fileSize > 32768 ? fileSize - 32768 : 0
+            fileHandle.seek(toFileOffset: readStart)
+            if let data = String(data: fileHandle.readDataToEndOfFile(), encoding: .utf8) {
+                let lines = data.components(separatedBy: "\n")
+                // If we seeked mid-file, drop the first (partial) line
+                let cleanLines = readStart > 0 ? Array(lines.dropFirst()) : lines
+                let tail = cleanLines.suffix(80).joined(separator: "\n")
+                content = tail.isEmpty ? "(empty)" : tail
             } else {
-                combined += "(no log file yet)\n"
+                content = "(unable to read log)"
             }
-            combined += "\n"
+        } else {
+            content = "(no log file yet)"
         }
 
         let window = InstructionWindow(
-            title: "Server Logs",
-            instructions: combined
+            title: "\(name) Log",
+            instructions: content
         )
         window.show()
     }
@@ -121,7 +150,7 @@ class InstructionWindow: NSObject, NSWindowDelegate {
     private let instructions: String
     private var window: NSWindow?
 
-    // Keep alive until window closes
+    // Keep alive until window closes — all access on main thread (BUG-10)
     private static var activeWindows: [InstructionWindow] = []
 
     init(title: String, instructions: String) {
@@ -130,9 +159,10 @@ class InstructionWindow: NSObject, NSWindowDelegate {
     }
 
     func show() {
-        InstructionWindow.activeWindows.append(self)
-
         DispatchQueue.main.async { [self] in
+            // Append on main thread to avoid data race (BUG-10)
+            InstructionWindow.activeWindows.append(self)
+
             let w = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 520, height: 420),
                 styleMask: [.titled, .closable],

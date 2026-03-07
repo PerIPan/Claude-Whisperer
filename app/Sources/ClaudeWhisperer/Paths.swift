@@ -3,7 +3,8 @@ import Foundation
 enum Paths {
     /// ~/Library/Application Support/ClaudeWhisperer
     static let appSupport: URL = {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
         return base.appendingPathComponent("ClaudeWhisperer")
     }()
 
@@ -11,26 +12,31 @@ enum Paths {
     static let venv = appSupport.appendingPathComponent("venv")
 
     /// Python binary inside venv
-    static let python = venv.appendingPathComponent("bin/python")
+    static let python = venv.appendingPathComponent("bin").appendingPathComponent("python")
+
+    /// App Resources directory (safe unwrap)
+    private static var resources: URL {
+        Bundle.main.resourceURL ?? Bundle.main.bundleURL.appendingPathComponent("Contents/Resources")
+    }
 
     /// uv binary (bundled in app Resources)
     static var uvBinary: URL {
-        Bundle.main.resourceURL!.appendingPathComponent("uv")
+        resources.appendingPathComponent("uv")
     }
 
     /// Bundled server scripts
     static var whisperServer: URL {
-        Bundle.main.resourceURL!.appendingPathComponent("servers/whisper_server.py")
+        resources.appendingPathComponent("servers").appendingPathComponent("whisper_server.py")
     }
 
     /// Bundled hook script
     static var ttsHook: URL {
-        Bundle.main.resourceURL!.appendingPathComponent("hooks/tts-hook.sh")
+        resources.appendingPathComponent("hooks").appendingPathComponent("tts-hook.sh")
     }
 
     /// Bundled speak script
     static var speakScript: URL {
-        Bundle.main.resourceURL!.appendingPathComponent("scripts/speak.sh")
+        resources.appendingPathComponent("scripts").appendingPathComponent("speak.sh")
     }
 
     /// Setup marker file
@@ -45,10 +51,16 @@ enum Paths {
     static let ttsLog = appSupport.appendingPathComponent("tts.log")
     static let setupLog = appSupport.appendingPathComponent("setup.log")
 
+    /// Auto-submit flag file (whisper_server.py checks this)
+    static let autoSubmitFlag = appSupport.appendingPathComponent("auto_submit")
+
+    /// Auto-focus app file (whisper_server.py reads target app name from this)
+    static let autoFocusApp = appSupport.appendingPathComponent("auto_focus_app")
+
     /// Claude Code settings
     static let claudeSettings: URL = {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude/settings.json")
+            .appendingPathComponent(".claude").appendingPathComponent("settings.json")
     }()
 
     /// Ensure directories exist

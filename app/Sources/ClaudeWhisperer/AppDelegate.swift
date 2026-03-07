@@ -13,11 +13,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             serverManager.startAll()
         } else {
             setupManager.runFirstLaunchSetup { [weak self] success in
-                if success {
+                guard success else { return }
+                // startAll must run on main thread (BUG-11: timer + process management)
+                DispatchQueue.main.async {
                     self?.serverManager.startAll()
-                    // Show setup instructions on first launch
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                        ConfigManager.showClaudeHookInstructions()
+                        ConfigManager.showClaudeSettingsInstructions()
                     }
                 }
             }

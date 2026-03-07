@@ -11,10 +11,13 @@ class ServerManager: ObservableObject {
 
     @Published var sttStatus: ServerStatus = .stopped
     @Published var ttsStatus: ServerStatus = .stopped
+    @Published var sttPort: Int = 8000
+    @Published var ttsPort: Int = 8100
 
     private var sttProcess: Process?
     private var ttsProcess: Process?
     private var healthCheckTimer: Timer?
+    private var pendingRestart: DispatchWorkItem?
 
     var isRunning: Bool {
         sttStatus == .running && ttsStatus == .running
@@ -28,42 +31,63 @@ class ServerManager: ObservableObject {
     }
 
     func startAll() {
-        Paths.ensureDirectories()
-        startSTT()
-        startTTS()
-        startHealthChecks()
+        // Must run on main thread for timer scheduling (BUG-08)
+        let work = { [self] in
+            Paths.ensureDirectories()
+            startSTT()
+            startTTS()
+            startHealthChecks()
+        }
+        if Thread.isMainThread {
+            work()
+        } else {
+            DispatchQueue.main.async(execute: work)
+        }
     }
 
     func stopAll() {
+        // Cancel any pending restart (BUG-12)
+        pendingRestart?.cancel()
+        pendingRestart = nil
+
         healthCheckTimer?.invalidate()
         healthCheckTimer = nil
+
+        // Non-blocking stop (BUG-02)
         stopProcess(&sttProcess, pidFile: Paths.sttPidFile)
         stopProcess(&ttsProcess, pidFile: Paths.ttsPidFile)
-        DispatchQueue.main.async {
-            self.sttStatus = .stopped
-            self.ttsStatus = .stopped
-        }
+
+        sttStatus = .stopped
+        ttsStatus = .stopped
     }
 
     func restartAll() {
+        // Cancel any previous pending restart (BUG-12)
+        pendingRestart?.cancel()
+
         stopAll()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            self.startAll()
+
+        let restart = DispatchWorkItem { [weak self] in
+            self?.startAll()
         }
+        pendingRestart = restart
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: restart)
     }
 
     // MARK: - STT Server
 
     private func startSTT() {
-        guard sttProcess == nil || !sttProcess!.isRunning else { return }
+        guard sttProcess == nil || sttProcess?.isRunning != true else { return }
 
-        DispatchQueue.main.async { self.sttStatus = .starting }
+        sttStatus = .starting
 
         let process = Process()
         process.executableURL = Paths.python
         process.arguments = [Paths.whisperServer.path]
         process.currentDirectoryURL = Paths.appSupport
-        process.environment = makeEnv()
+        var env = makeEnv()
+        env["STT_PORT"] = "\(sttPort)"
+        process.environment = env
 
         let logFile = FileHandle.forWritingOrCreate(at: Paths.sttLog)
         process.standardOutput = logFile
@@ -77,12 +101,15 @@ class ServerManager: ObservableObject {
             }
         }
 
+        // Assign before run so termination handler can match (BUG-09)
+        sttProcess = process
+
         do {
             try process.run()
-            sttProcess = process
             writePID(process.processIdentifier, to: Paths.sttPidFile)
         } catch {
-            DispatchQueue.main.async { self.sttStatus = .error }
+            sttProcess = nil
+            sttStatus = .error
             NSLog("Failed to start STT: \(error)")
         }
     }
@@ -90,13 +117,13 @@ class ServerManager: ObservableObject {
     // MARK: - TTS Server
 
     private func startTTS() {
-        guard ttsProcess == nil || !ttsProcess!.isRunning else { return }
+        guard ttsProcess == nil || ttsProcess?.isRunning != true else { return }
 
-        DispatchQueue.main.async { self.ttsStatus = .starting }
+        ttsStatus = .starting
 
         let process = Process()
         process.executableURL = Paths.python
-        process.arguments = ["-m", "mlx_audio.server", "--host", "127.0.0.1", "--port", "8100"]
+        process.arguments = ["-m", "mlx_audio.server", "--host", "127.0.0.1", "--port", "\(ttsPort)"]
         process.currentDirectoryURL = Paths.appSupport
         process.environment = makeEnv()
 
@@ -112,12 +139,15 @@ class ServerManager: ObservableObject {
             }
         }
 
+        // Assign before run so termination handler can match (BUG-09)
+        ttsProcess = process
+
         do {
             try process.run()
-            ttsProcess = process
             writePID(process.processIdentifier, to: Paths.ttsPidFile)
         } catch {
-            DispatchQueue.main.async { self.ttsStatus = .error }
+            ttsProcess = nil
+            ttsStatus = .error
             NSLog("Failed to start TTS: \(error)")
         }
     }
@@ -125,6 +155,8 @@ class ServerManager: ObservableObject {
     // MARK: - Health Checks
 
     private func startHealthChecks() {
+        // Timer must be on main thread RunLoop (BUG-08)
+        healthCheckTimer?.invalidate()
         healthCheckTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             self?.checkHealth()
         }
@@ -135,18 +167,16 @@ class ServerManager: ObservableObject {
     }
 
     private func checkHealth() {
-        checkEndpoint("http://localhost:8000/models") { [weak self] ok in
+        checkEndpoint("http://localhost:\(sttPort)/models") { [weak self] ok in
             DispatchQueue.main.async {
-                if self?.sttProcess?.isRunning == true {
-                    self?.sttStatus = ok ? .running : .starting
-                }
+                guard let self, self.sttStatus != .stopped else { return }
+                self.sttStatus = ok ? .running : .starting
             }
         }
-        checkEndpoint("http://localhost:8100/v1/models") { [weak self] ok in
+        checkEndpoint("http://localhost:\(ttsPort)/v1/models") { [weak self] ok in
             DispatchQueue.main.async {
-                if self?.ttsProcess?.isRunning == true {
-                    self?.ttsStatus = ok ? .running : .starting
-                }
+                guard let self, self.ttsStatus != .stopped else { return }
+                self.ttsStatus = ok ? .running : .starting
             }
         }
     }
@@ -169,9 +199,13 @@ class ServerManager: ObservableObject {
     private func stopProcess(_ process: inout Process?, pidFile: URL) {
         let proc = process
         process = nil  // Clear first so termination handler's === check fails
+
         if let proc = proc, proc.isRunning {
             proc.terminate()
-            proc.waitUntilExit()
+            // Non-blocking wait (BUG-02): wait in background, don't block UI
+            DispatchQueue.global(qos: .utility).async {
+                proc.waitUntilExit()
+            }
         }
         try? FileManager.default.removeItem(at: pidFile)
     }

@@ -7,7 +7,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$SCRIPT_DIR/.build"
 APP_NAME="Claude Whisperer"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
-DMG_NAME="ClaudeWhisperer-1.0.0"
+DMG_NAME="ClaudeWhisperer-1.1.0"
 
 echo "=== Building Claude Whisperer ==="
 
@@ -66,7 +66,18 @@ else
 fi
 chmod +x "$APP_BUNDLE/Contents/Resources/uv"
 
-# Step 5: Ad-hoc code sign
+# Step 5: Bundle jq binary
+echo "Bundling jq..."
+JQ_PATH=$(which jq 2>/dev/null || echo "")
+if [ -z "$JQ_PATH" ]; then
+    echo "jq not found — downloading for macOS ARM64..."
+    curl -LsS "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-macos-arm64" -o "$APP_BUNDLE/Contents/Resources/jq"
+else
+    cp "$JQ_PATH" "$APP_BUNDLE/Contents/Resources/jq"
+fi
+chmod +x "$APP_BUNDLE/Contents/Resources/jq"
+
+# Step 6: Ad-hoc code sign
 echo "Code signing..."
 codesign --force --deep --sign - "$APP_BUNDLE"
 

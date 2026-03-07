@@ -67,7 +67,9 @@ class SetupManager: ObservableObject {
 
             // Step 5: Install setuptools
             self?.updateState(.inProgress("Installing dependencies..."), progress: 0.7)
-            _ = self?.uvPipInstall("setuptools<81")
+            if self?.uvPipInstall("setuptools<81") != true {
+                NSLog("Warning: setuptools install failed — TTS server may not work")
+            }
 
             self?.updateState(.inProgress("Finishing up..."), progress: 0.9)
 
@@ -106,7 +108,9 @@ class SetupManager: ObservableObject {
 
         let logFile = FileHandle.forWritingOrCreate(at: Paths.setupLog)
         logFile.seekToEndOfFile()
-        logFile.write("=== \(step) ===\n\(executable) \(args.joined(separator: " "))\n".data(using: .utf8)!)
+        if let logData = "=== \(step) ===\n\(executable) \(args.joined(separator: " "))\n".data(using: .utf8) {
+            logFile.write(logData)
+        }
         process.standardOutput = logFile
         process.standardError = logFile
 
