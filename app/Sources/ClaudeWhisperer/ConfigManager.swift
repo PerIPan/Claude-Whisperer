@@ -63,7 +63,35 @@ enum ConfigManager {
         window.show()
     }
 
-    // MARK: - Voquill Instructions
+    // MARK: - Voquill Detection & Configuration
+
+    static func isVoquillInstalled() -> Bool {
+        FileManager.default.fileExists(atPath: "/Applications/Voquill.app")
+    }
+
+    /// Check if Voquill's SQLite config points to the local Whisper server.
+    static func isVoquillConfigured(port: Int) -> Bool {
+        let dbPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/com.voquill.desktop/voquill.db").path
+        guard FileManager.default.fileExists(atPath: dbPath) else { return false }
+
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+        proc.arguments = [dbPath, "SELECT base_url FROM api_keys WHERE provider='openai-compatible' LIMIT 1;"]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = FileHandle.nullDevice
+        do {
+            try proc.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            proc.waitUntilExit()
+            guard let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !output.isEmpty else { return false }
+            return output.contains("localhost:\(port)") || output.contains("127.0.0.1:\(port)")
+        } catch {
+            return false
+        }
+    }
 
     static func showVoquillInstructions(sttPort: Int) {
         let window = InstructionWindow(
@@ -71,16 +99,18 @@ enum ConfigManager {
             instructions: """
             Set up Voquill to use your local Whisper server:
 
-            1. Open Voquill settings
-            2. Select "OpenAI Compatible API" mode
+            1. Open Voquill → Settings → Providers
+            2. Add or edit an "OpenAI Compatible" provider
             3. Set these values:
 
-               Endpoint:  http://localhost:\(sttPort)
+               Base URL:  http://localhost:\(sttPort)
                Model:     whisper
                API Key:   whisper
-               Language:  en
 
-            4. Make sure the Whisper server is running
+            4. Go to Settings → General
+               Set Transcription to your new provider
+
+            5. Make sure the Whisper server is running
                (green dot in menubar)
 
             Voquill will now use your local Whisper for
@@ -90,26 +120,14 @@ enum ConfigManager {
         window.show()
     }
 
-    // MARK: - Voquill Download
+    static func openVoquill() {
+        NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Voquill.app"))
+    }
 
     static func showVoquillDownload() {
-        let window = InstructionWindow(
-            title: "Get Voquill",
-            instructions: """
-            Voquill is a free, open-source macOS dictation app
-            that works with your local Whisper server.
-
-            Download from GitHub:
-            https://github.com/nicobailey/Voquill
-
-            1. Go to the Releases page
-            2. Download the latest .dmg
-            3. Drag Voquill to Applications
-            4. Then use "Voquill Setup" in the menubar
-               to configure it for local Whisper
-            """
-        )
-        window.show()
+        if let url = URL(string: "https://github.com/josiahsrc/voquill/releases") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     // MARK: - Auto-apply hook to settings.json

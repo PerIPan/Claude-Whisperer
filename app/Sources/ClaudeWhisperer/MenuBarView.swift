@@ -17,6 +17,8 @@ struct MenuBarView: View {
     @State private var applyMessage = ""
     @State private var serverReachable = false
     @State private var hasTranscriptions = false
+    @State private var voquillInstalled = false
+    @State private var voquillConfigured = false
     @State private var cleanMessage = ""
     @ObservedObject private var overlay = TranscriptionOverlay.shared
 
@@ -345,31 +347,48 @@ struct MenuBarView: View {
                 DiagnosticRow(label: "Hook configured", ok: hookApplied)
                 DiagnosticRow(label: "Voice tag active", ok: claudeMdApplied)
                 DiagnosticRow(label: "Server reachable", ok: serverReachable)
+                DiagnosticRow(label: "Voquill", ok: voquillConfigured, notInstalled: !voquillInstalled)
             }
             .padding(.leading, 2)
 
             Divider().opacity(0.4)
 
             // Voquill
-            SectionHeader(title: "Voquill Setup Instructions", icon: "mic")
+            SectionHeader(title: "Voquill", icon: "mic")
 
-            Button(action: { ConfigManager.showVoquillInstructions(sttPort: serverManager.port) }) {
-                Label("Voquill Setup", systemImage: "mic.badge.plus")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(MenuBarRowButtonStyle())
-
-            Button(action: { ConfigManager.showVoquillDownload() }) {
-                Label("Get Voquill", systemImage: "arrow.down.circle")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(MenuBarRowButtonStyle())
-
-            if serverManager.status == .running && !hasTranscriptions {
-                Text("No speech received yet — is Voquill configured?")
+            if !voquillInstalled {
+                HStack(spacing: 6) {
+                    Button(action: { ConfigManager.showVoquillDownload() }) {
+                        Label("Get Voquill", systemImage: "arrow.down.circle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(MenuBarRowButtonStyle())
+                }
+                Text("Not installed")
                     .font(.custom("Outfit", size: 10))
-                    .foregroundColor(.orange)
+                    .foregroundColor(.secondary)
                     .padding(.leading, 2)
+            } else {
+                HStack(spacing: 6) {
+                    Button(action: { ConfigManager.openVoquill() }) {
+                        Label("Open Voquill", systemImage: "arrow.up.forward.app")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(MenuBarRowButtonStyle())
+
+                    Button(action: { ConfigManager.showVoquillInstructions(sttPort: serverManager.port) }) {
+                        Label("Setup Guide", systemImage: "questionmark.circle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(MenuBarRowButtonStyle())
+                }
+
+                if serverManager.status == .running && !hasTranscriptions && !voquillConfigured {
+                    Text("Not configured — open Voquill and set endpoint to localhost:\(serverManager.port)")
+                        .font(.custom("Outfit", size: 10))
+                        .foregroundColor(.orange)
+                        .padding(.leading, 2)
+                }
             }
 
             Divider().opacity(0.4)
@@ -472,6 +491,14 @@ struct MenuBarView: View {
         hookApplied = ConfigManager.checkHookConfigured()
         claudeMdApplied = ConfigManager.checkClaudeMdConfigured()
         hasTranscriptions = ConfigManager.sttHasReceivedRequests()
+        voquillInstalled = ConfigManager.isVoquillInstalled()
+        // Run sqlite3 check off main thread to avoid UI freeze
+        let port = serverManager.port
+        let installed = voquillInstalled
+        DispatchQueue.global(qos: .utility).async {
+            let configured = installed && ConfigManager.isVoquillConfigured(port: port)
+            DispatchQueue.main.async { voquillConfigured = configured }
+        }
         ConfigManager.testTTS(port: serverManager.port) { ok in
             serverReachable = ok
         }
@@ -585,15 +612,16 @@ struct PortField: View {
 struct DiagnosticRow: View {
     let label: String
     let ok: Bool
+    var notInstalled: Bool = false
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle")
+            Image(systemName: notInstalled ? "minus.circle" : (ok ? "checkmark.circle.fill" : "xmark.circle"))
                 .font(.system(size: 9))
-                .foregroundColor(ok ? .green : .secondary)
-            Text(label)
+                .foregroundColor(notInstalled ? .secondary : (ok ? .green : .secondary))
+            Text(notInstalled ? "\(label) (not installed)" : label)
                 .font(.custom("Outfit", size: 10))
-                .foregroundColor(ok ? .primary : .secondary)
+                .foregroundColor(notInstalled ? .secondary : (ok ? .primary : .secondary))
         }
     }
 }

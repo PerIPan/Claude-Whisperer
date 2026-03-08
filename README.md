@@ -8,7 +8,7 @@ Full interactive Voice mode for [Claude Code](https://claude.ai/claude-code) on 
 
 ## What It Does
 
-You use Claude Code normally. After every response, Claude's answer is automatically spoken aloud through your Mac's speakers using a local TTS model. For speech input, pair with [Voquill](https://github.com/nicobailey/Voquill) to dictate instead of type.
+You use Claude Code normally. After every response, Claude's answer is automatically spoken aloud through your Mac's speakers using a local TTS model. For speech input, pair with [Voquill](https://github.com/josiahsrc/voquill) to dictate instead of type.
 
 Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
@@ -29,24 +29,24 @@ The menubar icon gives you:
 - **Auto-Apply** — one-click setup for Claude hook (settings.json) and voice tag (CLAUDE.md)
 - **Diagnostic checklist** — shows hook, voice tag, and TTS status at a glance
 - **Transcription overlay** — floating window showing live speech-to-text output
-- Voquill Setup + download link (with detection hint if no speech received)
+- **Voquill detection** — auto-detects if Voquill is installed and configured for local Whisper
 - Unified server log (STT + TTS on single port, includes transcribed text)
 
 After setup, use the menubar buttons for configuration instructions.
 
 ## Speech Input with Voquill
 
-To talk *to* Claude (not just hear it), use [Voquill](https://github.com/nicobailey/Voquill) — a free, open-source macOS dictation app. Configure it to use your local Whisper server for much better accuracy than macOS dictation.
+To talk *to* Claude (not just hear it), use [Voquill](https://github.com/josiahsrc/voquill) — a free, open-source macOS dictation app. Configure it to use your local Whisper server for much better accuracy than macOS dictation.
 
 ### Voquill Setup
 
-1. Download [Voquill](https://github.com/nicobailey/Voquill) from GitHub releases
-2. Open Voquill → **Settings** → **Transcription**
-3. Set mode: **OpenAI Compatible API**
-4. Endpoint URL: `http://localhost:8000`
+1. Download [Voquill](https://github.com/josiahsrc/voquill) from GitHub releases
+2. Open Voquill → **Settings** → **Providers**
+3. Add or edit an **OpenAI Compatible** provider
+4. Base URL: `http://localhost:8000`
 5. Model: `whisper`
 6. API key: `whisper`
-7. Language: `en` (or your preferred language)
+7. Go to **Settings** → **General**, set Transcription to your new provider
 
 **Test it:** Speak into Voquill. You should see `POST /v1/audio/transcriptions` in the server terminal.
 
@@ -240,7 +240,7 @@ Contributions are welcome! Feel free to open issues or submit pull requests. Whe
 - [MLX Audio](https://github.com/Blaizzy/mlx-audio) — TTS and STT on Apple Silicon
 - [Kokoro](https://huggingface.co/prince-canuma/Kokoro-82M) — TTS model
 - [Claude Code](https://claude.ai/claude-code) — Anthropic's CLI
-- [Voquill](https://github.com/nicobailey/Voquill) — Open source dictation for macOS
+- [Voquill](https://github.com/josiahsrc/voquill) — Open source dictation for macOS
 
 ## License
 
