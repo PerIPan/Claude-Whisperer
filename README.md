@@ -26,8 +26,10 @@ The menubar icon gives you:
 - **Push-to-Talk** — hold Ctrl to record, release to transcribe and type into focused app
 - **Language selector** — set STT language to avoid hallucinations in other languages (auto-detect or pick from 17 languages)
 - **Voice picker** — choose from 8 Kokoro voices (no server restart needed)
-- **Automation** — Auto-Submit and Auto-Focus (requires Accessibility permission)
+- **Voice detail** — set VOICE tag verbosity: Brief (1 sentence), Natural (1-3), or Detailed (3-6)
+- **Automation** — Auto-Focus and Auto-Submit (requires Accessibility permission)
 - **Auto-Apply** — one-click setup for Claude hook (settings.json) and voice tag (CLAUDE.md)
+- **Accessibility prompt** — asks for permission on first launch with live granted/not-granted status
 - **Diagnostic checklist** — shows hook, voice tag, and TTS status at a glance
 - **Transcription overlay** — floating window showing live waveform and recent transcriptions
 - **Events log** — diagnostic log for troubleshooting paste and transcription issues
