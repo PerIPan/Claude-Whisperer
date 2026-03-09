@@ -111,9 +111,6 @@ struct MenuBarView: View {
                 // Server status — single unified server
                 StatusRow(label: "Whisper STT", subtitle: serverManager.sttModel, port: "\(serverManager.port)", status: serverManager.status)
                 StatusRow(label: "Kokoro TTS", subtitle: serverManager.ttsModel, port: "\(serverManager.port)", status: serverManager.status)
-
-                let isStopped = serverManager.status == .stopped
-                PortField(label: "Port", port: $serverManager.port, disabled: !isStopped)
             }
 
             Divider().opacity(0.4)
@@ -279,6 +276,20 @@ struct MenuBarView: View {
                         .padding(.leading, 2)
                         .lineLimit(2)
                 }
+
+                Toggle("Transcription Overlay", isOn: Binding(
+                    get: { overlay.isVisible },
+                    set: { enabled in
+                        if enabled {
+                            overlay.show()
+                        } else {
+                            overlay.hide()
+                        }
+                    }
+                ))
+                    .font(.custom("Outfit", size: 11))
+                    .toggleStyle(.checkbox)
+                    .padding(.top, 2)
             }
 
             Divider().opacity(0.4)
@@ -382,23 +393,12 @@ struct MenuBarView: View {
                     .transition(.opacity)
             }
 
-            Toggle("Transcription Overlay", isOn: Binding(
-                get: { overlay.isVisible },
-                set: { enabled in
-                    if enabled {
-                        overlay.show()
-                    } else {
-                        overlay.hide()
-                    }
-                }
-            ))
-                .font(.custom("Outfit", size: 11))
-                .toggleStyle(.checkbox)
+            let serverStopped = serverManager.status == .stopped
+            PortField(label: "Port", port: $serverManager.port, disabled: !serverStopped)
 
             Divider().opacity(0.4)
 
             // Server controls
-            let serverStopped = serverManager.status == .stopped
             HStack(spacing: 6) {
                 if serverStopped || serverManager.status == .error {
                     Button(action: { serverManager.startAll() }) {

@@ -84,9 +84,18 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
         w.isMovableByWindowBackground = true
         w.delegate = self
         w.contentView = hostingView
-        w.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.92)
+        w.backgroundColor = .clear
+        w.isOpaque = false
         w.hasShadow = true
         w.minSize = NSSize(width: 200, height: 80)
+
+        // Round corners
+        if let contentView = w.contentView {
+            contentView.wantsLayer = true
+            contentView.layer?.cornerRadius = 12
+            contentView.layer?.masksToBounds = true
+            contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.92).cgColor
+        }
 
         // Position bottom-right of screen
         if let screen = NSScreen.main {
