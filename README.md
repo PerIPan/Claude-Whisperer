@@ -8,7 +8,7 @@ Full interactive Voice mode for [Claude Code](https://claude.ai/claude-code) on 
 
 ## What It Does
 
-You use Claude Code normally. After every response, Claude's answer is automatically spoken aloud through your Mac's speakers using a local TTS model. For speech input, press **Ctrl** to record and release to transcribe — text is typed directly into your focused app.
+You use Claude Code normally. After every response, Claude's answer is automatically spoken aloud through your Mac's speakers using a local TTS model. For speech input, press **Ctrl** to record and press again to stop and transcribe — text is typed directly into your focused app.
 
 Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
@@ -23,7 +23,7 @@ On first launch, the app:
 
 The menubar icon gives you:
 - Start/Stop/Restart server with configurable port
-- **Push-to-Talk** — configurable hotkey (Ctrl, fn, Option, Cmd) to record, release to transcribe and type into focused app
+- **Push-to-Talk** — configurable hotkey (Ctrl, fn, Option, Cmd) to record
 - **Language selector** — set STT language to avoid hallucinations in other languages (auto-detect or pick from 17 languages)
 - **Voice picker** — choose from 11 Kokoro voices across 8 languages (no server restart needed)
 - **Voice detail** — set VOICE tag verbosity: Brief (1 sentence), Natural (1-3), or Detailed (4-6)
