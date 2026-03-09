@@ -31,13 +31,14 @@ class AccessibilityManager: ObservableObject {
     /// Uses .common run loop mode so it fires during menu bar tracking.
     private func startPolling() {
         pollTimer?.invalidate()
+        // Timer fires on main run loop (.common mode so it works during menu tracking)
         let timer = Timer(timeInterval: 2, repeats: true) { [weak self] t in
             let trusted = AXIsProcessTrusted()
-            DispatchQueue.main.async {
-                self?.isGranted = trusted
-            }
+            // Already on main thread (RunLoop.main), update directly
+            self?.isGranted = trusted
             if trusted {
                 t.invalidate()
+                self?.pollTimer = nil
             }
         }
         RunLoop.main.add(timer, forMode: .common)

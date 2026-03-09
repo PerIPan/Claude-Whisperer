@@ -50,9 +50,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard !dictationSetupDone else { return }
         dictationSetupDone = true
 
-        // Capture the frontmost app PID at the moment Ctrl is pressed down,
+        // Load saved hotkey preference
+        if let saved = try? String(contentsOf: Paths.pttHotkey, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
+           let key = PTTKey(rawValue: saved) {
+            hotkeyManager.pttKey = key
+        }
+
+        // Capture the frontmost app PID at the moment the hotkey is pressed down,
         // before recording UI or any window can steal focus away.
-        hotkeyManager.onCtrlDown = { [weak self] in
+        hotkeyManager.onKeyDown = { [weak self] in
             self?.dictationManager.captureTargetApp()
         }
         hotkeyManager.onToggle = { [weak self] in
@@ -61,6 +67,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyManager.start()
 
         TranscriptionOverlay.shared.dictationManager = dictationManager
+
+        // Show transcription overlay by default on launch
+        TranscriptionOverlay.shared.show()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

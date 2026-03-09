@@ -15,7 +15,9 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
 
     @Published var lines: [Line] = []
     @Published var isVisible: Bool = false
+    @Published var isTTSPlaying: Bool = false
     private var nextLineId = 0
+    private var ttsTimer: Timer?
 
     /// Reference to dictation manager for waveform display.
     ///
@@ -42,7 +44,7 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
     /// correctly, but ONLY if it holds the same instance that is actually recording.
     /// Previously, show() could capture a throwaway AudioRecorder() when
     /// dictationManager was nil, and that dead instance would be observed forever.
-    @Published var currentRecorder: AudioRecorder = AudioRecorder()
+    @Published var currentRecorder: AudioRecorder = AudioRecorder(skipPermissionCheck: true)
 
     func show() {
         if let w = window {
@@ -104,14 +106,16 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
             w.setFrameOrigin(NSPoint(x: x, y: y))
         }
 
-        w.makeKeyAndOrderFront(nil)
+        w.orderFront(nil)
         self.window = w
         isVisible = true
         startTailing()
+        startTTSPolling()
     }
 
     func hide() {
         stopTailing()
+        stopTTSPolling()
         window?.close()
         window = nil
         isVisible = false
@@ -119,8 +123,28 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
 
     func windowWillClose(_ notification: Notification) {
         stopTailing()
+        stopTTSPolling()
         window = nil
         isVisible = false
+    }
+
+    private func startTTSPolling() {
+        ttsTimer?.invalidate()
+        let lockPath = Paths.appSupport.appendingPathComponent("tts_playing.lock").path
+        let timer = Timer(timeInterval: 0.3, repeats: true) { [weak self] _ in
+            let playing = FileManager.default.fileExists(atPath: lockPath)
+            if self?.isTTSPlaying != playing {
+                self?.isTTSPlaying = playing
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        ttsTimer = timer
+    }
+
+    private func stopTTSPolling() {
+        ttsTimer?.invalidate()
+        ttsTimer = nil
+        isTTSPlaying = false
     }
 
     private func startTailing() {
@@ -177,9 +201,11 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
     }
 
     private func stopTailing() {
-        source?.cancel()
+        let src = source
         source = nil
         fileHandle = nil
+        // Cancel after clearing refs — the cancel handler closes the file handle
+        src?.cancel()
     }
 }
 
@@ -215,7 +241,7 @@ struct OverlayView: View {
             .frame(height: 14)
 
             // Waveform always visible — shows status label + bars
-            WaveformBar(recorder: recorder)
+            WaveformBar(recorder: recorder, isTTSPlaying: overlay.isTTSPlaying)
                 .frame(height: 36)
                 .padding(.horizontal, 8)
 
@@ -249,19 +275,17 @@ struct OverlayView: View {
 
 struct WaveformBar: View {
     @ObservedObject var recorder: AudioRecorder
+    var isTTSPlaying: Bool = false
 
     var body: some View {
         VStack(spacing: 4) {
             HStack(spacing: 4) {
                 Circle()
-                    .fill(recorder.state == .recording ? Color.red :
-                          recorder.state == .uploading ? Color.orange : Color.green)
+                    .fill(statusColor)
                     .frame(width: 8, height: 8)
-                Text(recorder.state == .recording ? "Recording..." :
-                     recorder.state == .uploading ? "Transcribing..." : "Standby")
+                Text(statusText)
                     .font(.custom("Outfit", size: 10))
-                    .foregroundColor(recorder.state == .recording ? .red :
-                                     recorder.state == .uploading ? .orange : .green)
+                    .foregroundColor(statusColor)
                 Spacer()
                 if recorder.state == .recording {
                     Text("Press Ctrl to stop")
@@ -270,26 +294,63 @@ struct WaveformBar: View {
                 }
             }
 
-            // Waveform — bars fill from the right so they're visible even in small windows
+            // Waveform — mic bars when recording, TTS pulse when speaking
             GeometryReader { geo in
                 let barWidth: CGFloat = 3
                 let spacing: CGFloat = 2
                 let maxBars = Int(geo.size.width / (barWidth + spacing))
-                let visibleCount = min(maxBars, recorder.levelHistory.count)
-                let startIndex = recorder.levelHistory.count - visibleCount
 
-                HStack(alignment: .center, spacing: spacing) {
-                    ForEach(startIndex..<recorder.levelHistory.count, id: \.self) { i in
-                        let level = CGFloat(recorder.levelHistory[i])
-                        let barHeight = max(2, level * geo.size.height * 0.9)
-                        RoundedRectangle(cornerRadius: 1.5)
-                            .fill(Color.orange.opacity(level * 0.5 + 0.5))
-                            .frame(width: barWidth, height: barHeight)
+                if isTTSPlaying && recorder.state == .idle {
+                    // TTS playback — animated pulsing bars (orange = Anthropic/Claude)
+                    TimelineView(.animation(minimumInterval: 0.05)) { timeline in
+                        let time = timeline.date.timeIntervalSinceReferenceDate
+                        HStack(alignment: .center, spacing: spacing) {
+                            ForEach(0..<maxBars, id: \.self) { i in
+                                let phase = sin(time * 3.5 + Double(i) * 0.3) * 0.5 + 0.5
+                                let barHeight = max(2, CGFloat(phase) * geo.size.height * 0.8)
+                                RoundedRectangle(cornerRadius: 1.5)
+                                    .fill(Color.orange.opacity(phase * 0.4 + 0.4))
+                                    .frame(width: barWidth, height: barHeight)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                     }
+                } else {
+                    // User mic recording waveform (green)
+                    let visibleCount = min(maxBars, recorder.levelHistory.count)
+                    let startIndex = recorder.levelHistory.count - visibleCount
+
+                    HStack(alignment: .center, spacing: spacing) {
+                        ForEach(startIndex..<recorder.levelHistory.count, id: \.self) { i in
+                            let level = CGFloat(recorder.levelHistory[i])
+                            let barHeight = max(2, level * geo.size.height)
+                            RoundedRectangle(cornerRadius: 1.5)
+                                .fill(Color.green.opacity(level * 0.5 + 0.5))
+                                .frame(width: barWidth, height: barHeight)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .opacity(recorder.state == .uploading ? 0.4 : recorder.state == .idle ? 0.3 : 1.0)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                .opacity(recorder.state == .uploading ? 0.4 : recorder.state == .idle ? 0.3 : 1.0)
             }
+        }
+    }
+
+    private var statusColor: Color {
+        if isTTSPlaying && recorder.state == .idle { return .orange }
+        switch recorder.state {
+        case .recording: return .green
+        case .uploading: return .orange
+        case .idle: return .green
+        }
+    }
+
+    private var statusText: String {
+        if isTTSPlaying && recorder.state == .idle { return "Speaking..." }
+        switch recorder.state {
+        case .recording: return "Recording..."
+        case .uploading: return "Transcribing..."
+        case .idle: return "Standby"
         }
     }
 }

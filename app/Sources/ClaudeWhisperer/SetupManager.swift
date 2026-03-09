@@ -28,7 +28,8 @@ class SetupManager: ObservableObject {
 
         Paths.ensureDirectories()
 
-        DispatchQueue.global(qos: .userInitiated).async { [self] in
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
             updateState(.inProgress("Creating Python environment..."), progress: 0.1)
 
             // Step 1: Create venv with bundled uv

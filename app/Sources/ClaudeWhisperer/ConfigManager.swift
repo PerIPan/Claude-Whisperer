@@ -23,7 +23,8 @@ enum ConfigManager {
                   "hooks": [{
                     "type": "command",
                     "command": "\(hookPath)",
-                    "timeout": 60
+                    "timeout": 60,
+                    "async": true
                   }]
                 }]
               }
@@ -70,6 +71,7 @@ enum ConfigManager {
     }
 
     /// Check if Voquill's SQLite config points to the local Whisper server.
+    /// NOTE: This runs a subprocess — call from a background thread to avoid blocking UI.
     static func isVoquillConfigured(port: Int) -> Bool {
         let dbPath = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/com.voquill.desktop/voquill.db").path
@@ -81,6 +83,8 @@ enum ConfigManager {
         let pipe = Pipe()
         proc.standardOutput = pipe
         proc.standardError = FileHandle.nullDevice
+        // Set a qualityOfService to ensure the process completes quickly
+        proc.qualityOfService = .userInitiated
         do {
             try proc.run()
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
@@ -132,6 +136,21 @@ enum ConfigManager {
 
     // MARK: - Auto-apply hook to settings.json
 
+    /// Patterns that identify any Claude Whisper/Whisperer TTS hook command
+    private static let hookPatterns = [
+        "tts-hook.sh",
+        "Claude Whisper",
+        "Claude Whisperer",
+        "ClaudeWhisper",
+        "ClaudeWhisperer",
+        "mlx-openai-whisper",
+    ]
+
+    /// Returns true if a hook command string belongs to Claude Whisper (any variant)
+    private static func isOurHook(_ command: String) -> Bool {
+        hookPatterns.contains { command.contains($0) }
+    }
+
     static func applyHookToSettings() -> (success: Bool, message: String) {
         let hookPath = Paths.ttsHook.path
         let settingsDir = Paths.claudeSettings.deletingLastPathComponent()
@@ -147,27 +166,26 @@ enum ConfigManager {
             settings = json
         }
 
-        // Build the hook entry
-        let hookEntry: [String: Any] = ["type": "command", "command": hookPath, "timeout": 60]
-        let stopEntry: [String: Any] = ["hooks": [hookEntry]]
-
         // Get or create hooks.Stop array
         var hooks = settings["hooks"] as? [String: Any] ?? [:]
         var stopArray = hooks["Stop"] as? [[String: Any]] ?? []
 
-        // Check if hook is already present
-        let alreadyPresent = stopArray.contains { entry in
-            if let innerHooks = entry["hooks"] as? [[String: Any]] {
-                return innerHooks.contains { $0["command"] as? String == hookPath }
+        // Remove ALL existing Claude Whisper/Whisperer hooks (any path variant)
+        let countBefore = stopArray.count
+        stopArray.removeAll { entry in
+            guard let innerHooks = entry["hooks"] as? [[String: Any]] else { return false }
+            return innerHooks.contains { hook in
+                guard let cmd = hook["command"] as? String else { return false }
+                return isOurHook(cmd)
             }
-            return false
         }
+        let removed = countBefore - stopArray.count
 
-        if alreadyPresent {
-            return (true, "Hook already configured")
-        }
-
+        // Add exactly one hook with the current path
+        let hookEntry: [String: Any] = ["type": "command", "command": hookPath, "timeout": 60, "async": true]
+        let stopEntry: [String: Any] = ["hooks": [hookEntry]]
         stopArray.append(stopEntry)
+
         hooks["Stop"] = stopArray
         settings["hooks"] = hooks
 
@@ -189,7 +207,8 @@ enum ConfigManager {
 
         do {
             try jsonString.write(to: Paths.claudeSettings, atomically: true, encoding: .utf8)
-            return (true, "Hook applied to settings.json")
+            let msg = removed > 0 ? "Replaced \(removed) old hook(s)" : "Hook applied"
+            return (true, msg)
         } catch {
             return (false, "Write failed: \(error.localizedDescription)")
         }
@@ -259,9 +278,9 @@ enum ConfigManager {
             return """
 
             ## Voice Mode
-            ALWAYS include a `[VOICE: ...]` tag at the END of every response. Give a thorough spoken summary (3-6 sentences) covering what you did, why, and any important details the user should know. Write as natural conversational speech — no code, no file paths, no markdown, no technical jargon unless the user used it first.
+            ALWAYS include a `[VOICE: ...]` tag at the END of every response. Give a DETAILED spoken summary of 4-6 sentences minimum. Cover: what you changed, why you changed it, how it works, any trade-offs or side effects, and what the user should do next. Be thorough — the user relies on this voice summary to understand your work without reading the full response. Write as natural conversational speech — no code, no file paths, no markdown, no technical jargon unless the user used it first.
 
-            Example: `[VOICE: I fixed the bug in the login page. The issue was a missing null check on the user object, which caused a crash when the session expired. I also added a fallback redirect to the login screen. You should test it with an expired session to make sure it works correctly.]`
+            Example: `[VOICE: I restructured the authentication flow to fix the login crash. The root cause was a missing null check on the user object that happened when sessions expired. I added a guard clause that catches the nil case and redirects to the login screen with a friendly error message. I also updated the session timeout to two hours so it happens less often. You should test this by logging in, waiting a bit, then refreshing to make sure the redirect works. One thing to note is the longer timeout means users stay logged in longer, so consider if that fits your security needs.]`
             """
         default: // "natural"
             return """
@@ -291,6 +310,10 @@ enum ConfigManager {
                 result.append(line)
             }
         }
+        // Strip trailing blank lines to prevent accumulation on repeated updates
+        while let last = result.last, last.trimmingCharacters(in: .whitespaces).isEmpty {
+            result.removeLast()
+        }
         return result.joined(separator: "\n")
     }
 
@@ -301,12 +324,13 @@ enum ConfigManager {
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let hooks = json["hooks"] as? [String: Any],
               let stopArray = hooks["Stop"] as? [[String: Any]] else { return false }
-        let hookPath = Paths.ttsHook.path
+        // Accept any Claude Whisper hook variant as "configured"
         return stopArray.contains { entry in
-            if let innerHooks = entry["hooks"] as? [[String: Any]] {
-                return innerHooks.contains { $0["command"] as? String == hookPath }
+            guard let innerHooks = entry["hooks"] as? [[String: Any]] else { return false }
+            return innerHooks.contains { hook in
+                guard let cmd = hook["command"] as? String else { return false }
+                return isOurHook(cmd)
             }
-            return false
         }
     }
 
@@ -337,7 +361,8 @@ enum ConfigManager {
         let start: UInt64 = size > 16384 ? size - 16384 : 0
         handle.seek(toFileOffset: start)
         let data = handle.readDataToEndOfFile()
-        guard let text = String(data: data, encoding: .utf8) else { return false }
+        guard let text = String(data: data, encoding: .utf8)
+                ?? String(data: data, encoding: .isoLatin1) else { return false }
         return text.contains("POST /v1/audio/transcriptions") || text.contains("Transcribed:")
     }
 

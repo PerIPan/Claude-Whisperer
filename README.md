@@ -14,7 +14,7 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ## Install
 
-[**Download ClaudeWhisperer-1.2.1.dmg**](https://github.com/PerIPan/Claude-Whisperer/releases/download/v1.2.1/ClaudeWhisperer-1.2.1.dmg) — drag to Applications and launch.
+[**Download ClaudeWhisperer-1.2.2.dmg**](https://github.com/PerIPan/Claude-Whisperer/releases/download/v1.2.2/ClaudeWhisperer-1.2.2.dmg) — drag to Applications and launch.
 
 On first launch, the app:
 - Creates a Python environment with all dependencies
@@ -23,10 +23,11 @@ On first launch, the app:
 
 The menubar icon gives you:
 - Start/Stop/Restart server with configurable port
-- **Push-to-Talk** — hold Ctrl to record, release to transcribe and type into focused app
+- **Push-to-Talk** — configurable hotkey (Ctrl, fn, Option, Cmd) to record, release to transcribe and type into focused app
 - **Language selector** — set STT language to avoid hallucinations in other languages (auto-detect or pick from 17 languages)
-- **Voice picker** — choose from 8 Kokoro voices (no server restart needed)
-- **Voice detail** — set VOICE tag verbosity: Brief (1 sentence), Natural (1-3), or Detailed (3-6)
+- **Voice picker** — choose from 11 Kokoro voices across 8 languages (no server restart needed)
+- **Voice detail** — set VOICE tag verbosity: Brief (1 sentence), Natural (1-3), or Detailed (4-6)
+- **Start on startup** — optional login item to launch automatically when you log in
 - **Automation** — Auto-Focus and Auto-Submit (requires Accessibility permission)
 - **Auto-Apply** — one-click setup for Claude hook (settings.json) and voice tag (CLAUDE.md)
 - **Accessibility prompt** — asks for permission on first launch with live granted/not-granted status
@@ -75,7 +76,7 @@ Example: *"fix the login bug, submit"* → types "fix the login bug" and presses
 
 #### Auto-Focus
 
-Enable **Auto-Focus** to automatically bring a specific app to the front when you finish speaking. Pick from the dropdown (VS Code, Code Insiders, Cursor, Windsurf, Terminal, iTerm2, Warp, Alacritty, Ghostty) or select **Custom** to type any app name.
+Enable **Auto-Focus** to automatically bring a specific app to the front when you finish speaking. Pick from 15 apps (VS Code, Cursor, Windsurf, Zed, Xcode, Sublime Text, Nova, Fleet, Claude, Terminal, iTerm2, Warp, Alacritty, Ghostty) or select **CUSTOM** to type any app name. Uses native `NSRunningApplication.activate()` — no System Events permission needed.
 
 ### Fallback: macOS Dictation
 
@@ -207,7 +208,7 @@ chmod +x build-dmg.sh
 ./build-dmg.sh
 ```
 
-Requires Xcode Command Line Tools. Produces `Claude Whisperer.app` and `ClaudeWhisperer-1.2.1.dmg` in `app/.build/`.
+Requires Xcode Command Line Tools. Produces `Claude Whisperer.app` and `ClaudeWhisperer-1.2.2.dmg` in `app/.build/`.
 
 ## File Structure
 

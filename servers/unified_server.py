@@ -1,6 +1,8 @@
 """Unified MLX Audio server — TTS + STT with auto-submit, auto-focus, barge-in."""
 
 import asyncio
+import ctypes
+import ctypes.util
 import logging
 import os
 import re
@@ -78,7 +80,8 @@ _SUBMIT_PATTERNS = {
 }
 
 _ALLOWED_FOCUS_APPS = {
-    "Code", "Code - Insiders", "Cursor", "Windsurf", "Claude",
+    "Code", "Code - Insiders", "Cursor", "Windsurf", "Zed", "Xcode",
+    "Sublime Text", "Nova", "Fleet", "Claude",
     "Terminal", "iTerm2", "Warp", "Alacritty", "Ghostty",
 }
 
@@ -126,8 +129,9 @@ def focus_target_app():
             if not re.match(r'^[A-Za-z0-9 ._-]+$', app_name):
                 logger.warning("Blocked suspicious auto-focus app name: %r", app_name)
                 return
+        # Use native `open -a` — no System Events permission needed
         subprocess.Popen(
-            ["osascript", "-e", f'tell application "{app_name}" to activate'],
+            ["open", "-a", app_name],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
     except Exception:
@@ -173,11 +177,27 @@ def kill_tts():
 
 
 def press_cmd_enter():
+    """Send Cmd+Enter via CGEvent (needs Accessibility, not System Events)."""
     try:
-        subprocess.Popen(
-            ["osascript", "-e", 'tell application "System Events" to key code 36 using command down'],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
+        _cg = ctypes.cdll.LoadLibrary(ctypes.util.find_library("CoreGraphics"))
+        _cg.CGEventCreateKeyboardEvent.restype = ctypes.c_void_p
+        _cg.CGEventCreateKeyboardEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint16, ctypes.c_bool]
+        _cg.CGEventSetFlags.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
+        _cg.CGEventPost.argtypes = [ctypes.c_uint32, ctypes.c_void_p]
+        _cg.CFRelease.argtypes = [ctypes.c_void_p]
+
+        kCGSessionEventTap = 1
+        kCGEventFlagMaskCommand = 0x00100000
+        kVK_Return = 0x24  # 36
+
+        key_down = _cg.CGEventCreateKeyboardEvent(None, kVK_Return, True)
+        key_up = _cg.CGEventCreateKeyboardEvent(None, kVK_Return, False)
+        _cg.CGEventSetFlags(key_down, kCGEventFlagMaskCommand)
+        _cg.CGEventSetFlags(key_up, kCGEventFlagMaskCommand)
+        _cg.CGEventPost(kCGSessionEventTap, key_down)
+        _cg.CGEventPost(kCGSessionEventTap, key_up)
+        _cg.CFRelease(key_down)
+        _cg.CFRelease(key_up)
     except Exception:
         logger.exception("press_cmd_enter failed")
 
@@ -241,7 +261,8 @@ async def transcribe(
 
     try:
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, focus_target_app)
+        # NOTE: focus_target_app removed — the Swift app handles activation
+        # natively via NSRunningApplication.activate() before text insertion.
 
         should_submit = False
         if os.path.exists(AUTO_SUBMIT_FLAG):

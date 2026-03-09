@@ -2,7 +2,7 @@
 # Speaks text via local mlx_audio TTS server
 # Usage: echo "text" | ./speak.sh  OR  ./speak.sh "text to speak"
 
-TTS_URL="${TTS_URL:-http://localhost:8100/v1/audio/speech}"
+TTS_URL="${TTS_URL:-http://localhost:8000/v1/audio/speech}"
 VOICE="${TTS_VOICE:-af_heart}"
 MODEL="${TTS_MODEL:-prince-canuma/Kokoro-82M}"
 TMPFILE=$(mktemp /tmp/tts_XXXXXX.wav)

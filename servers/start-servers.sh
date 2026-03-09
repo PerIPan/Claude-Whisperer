@@ -16,41 +16,21 @@ fi
 
 source "$VENV_PATH/bin/activate"
 
-STT_PORT="${STT_PORT:-8000}"
-TTS_PORT="${TTS_PORT:-8100}"
+export SERVER_PORT="${SERVER_PORT:-8000}"
 
-echo "Starting Whisper STT on http://localhost:$STT_PORT"
-python "$SCRIPT_DIR/whisper_server.py" &
+echo "Starting unified server (STT+TTS) on http://localhost:$SERVER_PORT"
+python "$SCRIPT_DIR/unified_server.py" &
 STT_PID=$!
+TTS_PID=$STT_PID
 
-echo "Starting TTS on http://localhost:$TTS_PORT"
-python -m mlx_audio.server --host 127.0.0.1 --port "$TTS_PORT" &
-TTS_PID=$!
-
-# Wait for servers to be ready
-echo "Waiting for Whisper server..."
-STT_READY=false
-for i in $(seq 1 30); do
-  curl -s "http://localhost:$STT_PORT/models" > /dev/null 2>&1 && { STT_READY=true; break; }
-  sleep 1
-done
-$STT_READY || echo "WARNING: Whisper server did not start within 30s"
-
-echo "Waiting for TTS server..."
-TTS_READY=false
+# Wait for server to be ready
+echo "Waiting for server..."
+READY=false
 for i in $(seq 1 60); do
-  curl -s "http://localhost:$TTS_PORT/v1/models" > /dev/null 2>&1 && { TTS_READY=true; break; }
+  curl -s "http://localhost:$SERVER_PORT/v1/models" > /dev/null 2>&1 && { READY=true; break; }
   sleep 1
 done
-$TTS_READY || echo "WARNING: TTS server did not start within 60s"
-
-echo ""
-if $STT_READY && $TTS_READY; then
-  echo "Servers ready. For voice input, run in another terminal:"
-else
-  echo "Some servers may not be ready. For voice input, run in another terminal:"
-fi
-echo "  ./scripts/start-input-voice-whisper.sh"
+$READY && echo "Server ready." || echo "WARNING: Server did not start within 60s"
 echo ""
 echo "Press Ctrl+C to stop servers."
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import ServiceManagement
 
 struct MenuBarView: View {
     @EnvironmentObject var serverManager: ServerManager
@@ -11,25 +12,38 @@ struct MenuBarView: View {
     @State private var focusSelection = "Code"  // visual default; only written on explicit toggle
     @State private var customFocusApp = ""
     @State private var saveDebounce: DispatchWorkItem?
+    @State private var selectedPTTKey = "ctrl"
     @State private var selectedVoice = "af_heart"
-    @State private var selectedLanguage = "auto"
+    @State private var selectedLanguage = "en"
     @State private var selectedDetail = "natural"
     @State private var showStoppedBanner = false
     @State private var hookApplied = false
     @State private var claudeMdApplied = false
     @State private var applyMessage = ""
     @State private var serverReachable = false
+    @State private var launchAtLogin = false
     @ObservedObject private var overlay = TranscriptionOverlay.shared
 
     private static let voices: [(id: String, label: String)] = [
-        ("af_heart", "Heart (Female)"),
-        ("af_bella", "Bella (Female)"),
-        ("af_sarah", "Sarah (Female)"),
-        ("af_nicole", "Nicole (Female)"),
-        ("am_michael", "Michael (Male)"),
-        ("am_adam", "Adam (Male)"),
-        ("bf_emma", "Emma (British F)"),
-        ("bm_george", "George (British M)"),
+        // English
+        ("af_heart", "Heart (English F)"),
+        ("af_bella", "Bella (English F)"),
+        ("am_michael", "Michael (English M)"),
+        // French
+        ("ff_siwis", "Siwis (French F)"),
+        // Spanish
+        ("ef_dora", "Dora (Spanish F)"),
+        // Italian
+        ("if_sara", "Sara (Italian F)"),
+        ("im_nicola", "Nicola (Italian M)"),
+        // Portuguese
+        ("pf_dora", "Dora (Portuguese F)"),
+        // Hindi
+        ("hf_alpha", "Alpha (Hindi F)"),
+        // Japanese
+        ("jf_alpha", "Alpha (Japanese F)"),
+        // Chinese
+        ("zf_xiaobei", "Xiaobei (Chinese F)"),
     ]
 
     private static let languages: [(id: String, label: String)] = [
@@ -59,18 +73,23 @@ struct MenuBarView: View {
         ("detailed", "Detailed"),
     ]
 
-    private static let focusApps = [
-        "Code",
-        "Code - Insiders",
-        "Cursor",
-        "Windsurf",
-        "Claude",
-        "Terminal",
-        "iTerm2",
-        "Warp",
-        "Alacritty",
-        "Ghostty",
-        "Custom"
+    private static let focusApps: [(id: String, label: String)] = [
+        ("Code", "VS Code"),
+        ("Code - Insiders", "VS Code Insiders"),
+        ("Cursor", "Cursor (AI Editor)"),
+        ("Windsurf", "Windsurf (AI Editor)"),
+        ("Zed", "Zed (Editor)"),
+        ("Xcode", "Xcode (Apple IDE)"),
+        ("Sublime Text", "Sublime Text (Editor)"),
+        ("Nova", "Nova (Panic)"),
+        ("Fleet", "Fleet (JetBrains)"),
+        ("Claude", "Claude (Desktop)"),
+        ("Terminal", "Terminal (macOS)"),
+        ("iTerm2", "iTerm2 (Terminal)"),
+        ("Warp", "Warp (Terminal)"),
+        ("Alacritty", "Alacritty (Terminal)"),
+        ("Ghostty", "Ghostty (Terminal)"),
+        ("CUSTOM", "CUSTOM"),
     ]
 
     var body: some View {
@@ -155,7 +174,7 @@ struct MenuBarView: View {
             .onChange(of: autoFocusEnabled) { _, enabled in
                 if enabled {
                     if focusAppName.isEmpty {
-                        focusAppName = focusSelection == "Custom" ? customFocusApp : focusSelection
+                        focusAppName = focusSelection == "CUSTOM" ? customFocusApp : focusSelection
                     }
                     saveFocusApp()
                 } else {
@@ -171,15 +190,15 @@ struct MenuBarView: View {
 
             if autoFocusEnabled {
                 Picker("", selection: $focusSelection) {
-                    ForEach(Self.focusApps, id: \.self) { app in
-                        Text(app).tag(app)
+                    ForEach(Self.focusApps, id: \.id) { app in
+                        Text(app.label).tag(app.id)
                     }
                 }
                 .labelsHidden()
                 .frame(maxWidth: .infinity)
                 .padding(.leading, 20)
                 .onChange(of: focusSelection) { _, newValue in
-                    if newValue == "Custom" {
+                    if newValue == "CUSTOM" {
                         focusAppName = customFocusApp
                     } else {
                         focusAppName = newValue
@@ -187,7 +206,7 @@ struct MenuBarView: View {
                     saveFocusApp()
                 }
 
-                if focusSelection == "Custom" {
+                if focusSelection == "CUSTOM" {
                     TextField("App name", text: $customFocusApp)
                         .textFieldStyle(.roundedBorder)
                         .font(.custom("Outfit", size: 12))
@@ -205,7 +224,7 @@ struct MenuBarView: View {
 
             // Language & Voice
             HStack {
-                Text("Language")
+                Text("Dictate")
                     .font(.custom("Outfit", size: 12))
                     .frame(width: 60, alignment: .leading)
                 Picker("", selection: $selectedLanguage) {
@@ -283,11 +302,22 @@ struct MenuBarView: View {
                          dictationManager.recorderState == .uploading ? "Transcribing..." : "Standby")
                         .font(.custom("Outfit", size: 12))
                     Spacer()
-                    Text("Ctrl to toggle")
-                        .font(.custom("Outfit", size: 10))
-                        .foregroundColor(.secondary)
+                    Picker("", selection: $selectedPTTKey) {
+                        ForEach(PTTKey.allCases, id: \.rawValue) { key in
+                            Text(key.label).tag(key.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 70)
                 }
                 .padding(.horizontal, 2)
+                .onChange(of: selectedPTTKey) { _, newValue in
+                    try? newValue.write(to: Paths.pttHotkey, atomically: true, encoding: .utf8)
+                    if let key = PTTKey(rawValue: newValue),
+                       let appDelegate = NSApp.delegate as? AppDelegate {
+                        appDelegate.hotkeyManager.pttKey = key
+                    }
+                }
 
                 if let err = dictationManager.error {
                     Text(err)
@@ -297,19 +327,25 @@ struct MenuBarView: View {
                         .lineLimit(2)
                 }
 
-                Toggle("Transcription Overlay", isOn: Binding(
-                    get: { overlay.isVisible },
-                    set: { enabled in
-                        if enabled {
-                            overlay.show()
-                        } else {
-                            overlay.hide()
+                HStack(spacing: 6) {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                    Text("Transcription Overlay")
+                        .font(.custom("Outfit", size: 11))
+                    Spacer()
+                    Picker("", selection: Binding(
+                        get: { overlay.isVisible ? "on" : "off" },
+                        set: { newValue in
+                            if newValue == "on" { overlay.show() } else { overlay.hide() }
                         }
+                    )) {
+                        Text("ON").tag("on")
+                        Text("OFF").tag("off")
                     }
-                ))
-                    .font(.custom("Outfit", size: 11))
-                    .toggleStyle(.checkbox)
-                    .padding(.top, 2)
+                    .labelsHidden()
+                    .frame(width: 70)
+                }
             }
 
             Divider().opacity(0.4)
@@ -370,9 +406,50 @@ struct MenuBarView: View {
             VStack(alignment: .leading, spacing: 2) {
                 DiagnosticRow(label: "Hook configured", ok: hookApplied)
                 DiagnosticRow(label: "Voice tag active", ok: claudeMdApplied)
-                DiagnosticRow(label: "Server reachable", ok: serverReachable)
             }
             .padding(.leading, 2)
+
+            Divider().opacity(0.4)
+
+            // Server controls
+            SectionHeader(title: "Server Config", icon: "gearshape")
+
+            let serverStopped = serverManager.status == .stopped
+
+            HStack(spacing: 6) {
+                if serverStopped || serverManager.status == .error {
+                    Button(action: { serverManager.startAll() }) {
+                        Label("Start Server", systemImage: "play.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(MenuBarRowButtonStyle())
+                } else {
+                    Button(action: {
+                        serverManager.stopAll()
+                        showStoppedBanner = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            showStoppedBanner = false
+                        }
+                    }) {
+                        Label("Stop", systemImage: "stop.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(MenuBarRowButtonStyle())
+                }
+
+                PortField(label: "", port: $serverManager.port, disabled: !serverStopped)
+            }
+
+            if showStoppedBanner {
+                Text("Server stopped")
+                    .font(.custom("Outfit", size: 11))
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .transition(.opacity)
+            }
+
+            DiagnosticRow(label: "Server reachable", ok: serverReachable)
+                .padding(.leading, 2)
 
             Divider().opacity(0.4)
 
@@ -395,72 +472,32 @@ struct MenuBarView: View {
 
             Divider().opacity(0.4)
 
-            // Server controls
-            let serverStopped = serverManager.status == .stopped
-            PortField(label: "Server Port", port: $serverManager.port, disabled: !serverStopped)
-
-            HStack(spacing: 6) {
-                if serverStopped || serverManager.status == .error {
-                    Button(action: { serverManager.startAll() }) {
-                        Label("Start Server", systemImage: "play.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(MenuBarRowButtonStyle())
-
-                    if serverManager.status == .error {
-                        Button(action: { serverManager.restartAll() }) {
-                            Label("Restart", systemImage: "arrow.clockwise")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(MenuBarRowButtonStyle())
-                    }
-                } else {
-                    Button(action: {
-                        serverManager.stopAll()
-                        showStoppedBanner = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                            showStoppedBanner = false
-                        }
-                    }) {
-                        Label("Stop", systemImage: "stop.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(MenuBarRowButtonStyle())
-
-                    Button(action: { serverManager.restartAll() }) {
-                        Label("Restart", systemImage: "arrow.clockwise")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(MenuBarRowButtonStyle())
+            DiagnosticRow(label: accessibilityManager.isGranted ? "Accessibility granted" : "Accessibility not granted", ok: accessibilityManager.isGranted)
+                .padding(.leading, 2)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
                 }
-            }
 
-            if showStoppedBanner {
-                Text("Server stopped")
-                    .font(.custom("Outfit", size: 11))
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .transition(.opacity)
-            }
-
-            Divider().opacity(0.4)
-
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(accessibilityManager.isGranted ? Color.green : Color.red)
-                    .frame(width: 6, height: 6)
-                Text(accessibilityManager.isGranted ? "Accessibility: granted" : "Accessibility: not granted")
-                    .font(.custom("Outfit", size: 10))
-                    .foregroundStyle(accessibilityManager.isGranted ? .tertiary : .secondary)
-                Spacer()
-                if !accessibilityManager.isGranted {
-                    Button("Open Settings") {
-                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+            DiagnosticRow(label: "Start on startup", ok: launchAtLogin)
+                .padding(.leading, 2)
+                .contentShape(Rectangle())
+                .onTapGesture { launchAtLogin.toggle() }
+                .onChange(of: launchAtLogin) { _, enabled in
+                    let service = SMAppService.mainApp
+                    do {
+                        if enabled {
+                            try service.register()
+                        } else {
+                            try service.unregister()
+                        }
+                    } catch {
+                        NSLog("Login item toggle failed: \(error)")
+                        DispatchQueue.main.async {
+                            launchAtLogin = service.status == .enabled
+                        }
                     }
-                    .font(.custom("Outfit", size: 9))
-                    .buttonStyle(MenuBarRowButtonStyle())
                 }
-            }
 
             HStack {
                 Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
@@ -481,18 +518,23 @@ struct MenuBarView: View {
         .padding(16)
         .frame(width: 260)
         .onAppear {
+            launchAtLogin = SMAppService.mainApp.status == .enabled
             autoSubmit = FileManager.default.fileExists(atPath: Paths.autoSubmitFlag.path)
             autoFocusEnabled = FileManager.default.fileExists(atPath: Paths.autoFocusApp.path)
             if let saved = try? String(contentsOf: Paths.autoFocusApp, encoding: .utf8),
                !saved.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 let name = saved.trimmingCharacters(in: .whitespacesAndNewlines)
                 focusAppName = name
-                if Self.focusApps.contains(name) {
+                if Self.focusApps.contains(where: { $0.id == name }) {
                     focusSelection = name
                 } else {
-                    focusSelection = "Custom"
+                    focusSelection = "CUSTOM"
                     customFocusApp = name
                 }
+            }
+            if let savedKey = try? String(contentsOf: Paths.pttHotkey, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
+               PTTKey(rawValue: savedKey) != nil {
+                selectedPTTKey = savedKey
             }
             if let savedVoice = try? String(contentsOf: Paths.ttsVoice, encoding: .utf8),
                !savedVoice.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -608,9 +650,11 @@ struct PortField: View {
 
     var body: some View {
         HStack {
-            Text(label)
-                .font(.custom("Outfit", size: 12))
-                .frame(minWidth: 60, alignment: .leading)
+            if !label.isEmpty {
+                Text(label)
+                    .font(.custom("Outfit", size: 12))
+                    .frame(minWidth: 60, alignment: .leading)
+            }
             TextField("", text: $text)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 70)

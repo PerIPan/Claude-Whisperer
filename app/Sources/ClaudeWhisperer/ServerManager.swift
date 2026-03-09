@@ -71,6 +71,7 @@ class ServerManager: ObservableObject {
         _ = ConfigManager.cleanTempFiles()
 
         let proc = process
+        let procPid = proc?.processIdentifier
         process = nil
 
         healthCheckTimer?.invalidate()
@@ -80,14 +81,31 @@ class ServerManager: ObservableObject {
 
         let pidFile = Paths.serverPidFile
 
+        // Terminate on main thread (Process is not Sendable), then restart
         let restart = DispatchWorkItem { [weak self] in
-            Self.terminateProcess(proc, pidFile: pidFile)
-            DispatchQueue.main.async {
+            if let proc, proc.isRunning {
+                proc.terminate()
+                // Wait in background for process to exit
+                DispatchQueue.global(qos: .utility).async {
+                    for _ in 0..<30 {
+                        if !proc.isRunning { break }
+                        Thread.sleep(forTimeInterval: 0.1)
+                    }
+                    if proc.isRunning, let pid = procPid {
+                        kill(pid, SIGKILL)
+                    }
+                    try? FileManager.default.removeItem(at: pidFile)
+                    DispatchQueue.main.async {
+                        self?.startAll()
+                    }
+                }
+            } else {
+                try? FileManager.default.removeItem(at: pidFile)
                 self?.startAll()
             }
         }
         pendingRestart = restart
-        DispatchQueue.global(qos: .userInitiated).async(execute: restart)
+        DispatchQueue.main.async(execute: restart)
     }
 
     // MARK: - Unified Server
@@ -105,7 +123,9 @@ class ServerManager: ObservableObject {
         env["SERVER_PORT"] = "\(port)"
         proc.environment = env
 
-        try? logHandle?.close()
+        let oldHandle = logHandle
+        logHandle = nil
+        try? oldHandle?.close()
         Self.rotateLogIfNeeded(at: Paths.serverLog)
         let logFile = FileHandle.forWritingOrCreate(at: Paths.serverLog)
         logFile.seekToEndOfFile()
@@ -113,11 +133,12 @@ class ServerManager: ObservableObject {
         proc.standardOutput = logFile
         proc.standardError = logFile
 
+        // Capture the log handle for THIS process so terminationHandler closes the right one
+        let processLogHandle = logFile
         proc.terminationHandler = { [weak self] _ in
+            try? processLogHandle.close()
             DispatchQueue.main.async {
                 guard let self else { return }
-                try? self.logHandle?.close()
-                self.logHandle = nil
                 if self.stopping {
                     self.stopping = false
                 } else {
@@ -147,7 +168,7 @@ class ServerManager: ObservableObject {
 
     private func startHealthChecks() {
         healthCheckTimer?.invalidate()
-        let timer = Timer.scheduledTimer(withTimeInterval: Self.startupCheckInterval, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: Self.startupCheckInterval, repeats: true) { [weak self] _ in
             self?.checkHealth()
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -178,7 +199,7 @@ class ServerManager: ObservableObject {
                     // Switch to relaxed polling once server is confirmed running
                     if wasStarting {
                         self.healthCheckTimer?.invalidate()
-                        let timer = Timer.scheduledTimer(withTimeInterval: Self.runningCheckInterval, repeats: true) { [weak self] _ in
+                        let timer = Timer(timeInterval: Self.runningCheckInterval, repeats: true) { [weak self] _ in
                             self?.checkHealth()
                         }
                         RunLoop.main.add(timer, forMode: .common)

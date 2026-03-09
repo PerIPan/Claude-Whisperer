@@ -5,9 +5,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$SCRIPT_DIR/.build"
-APP_NAME="Claude Whisperer"
+APP_NAME="ClaudeWhisperer"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
-DMG_NAME="ClaudeWhisperer-1.2.1"
+DMG_NAME="ClaudeWhisperer-1.2.2"
 
 echo "=== Building Claude Whisperer ==="
 
@@ -109,4 +109,4 @@ echo "=== Done ==="
 echo "DMG: $DMG_OUTPUT"
 echo "App: $APP_BUNDLE"
 echo ""
-echo "To install: open the DMG and drag Claude Whisperer to Applications"
+echo "To install: open the DMG and drag ClaudeWhisperer to Applications"

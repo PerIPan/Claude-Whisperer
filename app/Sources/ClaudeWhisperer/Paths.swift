@@ -15,29 +15,21 @@ enum Paths {
     static let python = venv.appendingPathComponent("bin").appendingPathComponent("python")
 
     /// App Resources directory (safe unwrap)
-    private static var resources: URL {
+    private static let resources: URL = {
         Bundle.main.resourceURL ?? Bundle.main.bundleURL.appendingPathComponent("Contents/Resources")
-    }
+    }()
 
     /// uv binary (bundled in app Resources)
-    static var uvBinary: URL {
-        resources.appendingPathComponent("uv")
-    }
+    static let uvBinary = resources.appendingPathComponent("uv")
 
     /// Unified server script (TTS + STT in one process)
-    static var unifiedServer: URL {
-        resources.appendingPathComponent("servers").appendingPathComponent("unified_server.py")
-    }
+    static let unifiedServer = resources.appendingPathComponent("servers").appendingPathComponent("unified_server.py")
 
     /// Bundled hook script
-    static var ttsHook: URL {
-        resources.appendingPathComponent("hooks").appendingPathComponent("tts-hook.sh")
-    }
+    static let ttsHook = resources.appendingPathComponent("hooks").appendingPathComponent("tts-hook.sh")
 
     /// Bundled speak script
-    static var speakScript: URL {
-        resources.appendingPathComponent("scripts").appendingPathComponent("speak.sh")
-    }
+    static let speakScript = resources.appendingPathComponent("scripts").appendingPathComponent("speak.sh")
 
     /// Setup marker file
     static let setupComplete = appSupport.appendingPathComponent(".setup-complete")
@@ -63,6 +55,9 @@ enum Paths {
 
     /// Voice detail level file (controls VOICE tag verbosity in CLAUDE.md)
     static let voiceDetail = appSupport.appendingPathComponent("voice_detail")
+
+    /// Push-to-talk hotkey preference (ctrl, option, cmd, fn)
+    static let pttHotkey = appSupport.appendingPathComponent("ptt_hotkey")
 
     /// Claude Code settings
     static let claudeSettings: URL = {

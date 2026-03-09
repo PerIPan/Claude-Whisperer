@@ -23,11 +23,21 @@ fi
 
 # Serialize concurrent hook invocations with mkdir-based lock (atomic on all filesystems)
 HOOK_LOCK="$APP_SUPPORT/tts_hook.lockdir"
+# Clean stale lock from crashed previous run (older than 30s)
+if [ -d "$HOOK_LOCK" ]; then
+  LOCK_AGE=$(( $(date +%s) - $(stat -f %m "$HOOK_LOCK" 2>/dev/null || echo 0) ))
+  if [ "$LOCK_AGE" -gt 30 ]; then
+    rm -rf "$HOOK_LOCK"
+  fi
+fi
+LOCK_ACQUIRED=false
 for _try in 1 2 3 4 5; do
-  if mkdir "$HOOK_LOCK" 2>/dev/null; then break; fi
+  if mkdir "$HOOK_LOCK" 2>/dev/null; then LOCK_ACQUIRED=true; break; fi
   sleep 0.2
 done
 trap 'rm -rf "$HOOK_LOCK"' EXIT
+# If lock not acquired after retries, another hook is running — skip
+if [ "$LOCK_ACQUIRED" = "false" ]; then exit 0; fi
 
 # Kill any previous TTS playback (validate PID before killing)
 if [ -f "$PIDFILE" ] && [ ! -L "$PIDFILE" ]; then
@@ -141,6 +151,6 @@ fi
 echo $! > "$PIDFILE"
 
 # Release hook lock now that PID is written (trap will also clean up)
-rm -f "$HOOK_LOCK"
+rmdir "$HOOK_LOCK" 2>/dev/null
 
 exit 0
