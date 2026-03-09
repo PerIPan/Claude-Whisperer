@@ -24,7 +24,7 @@ On first launch, the app:
 The menubar icon gives you:
 - Start/Stop/Restart server with configurable port
 - **Push-to-Talk** — configurable hotkey (Ctrl, fn, Option, Cmd) to record
-- **Language selector** — set STT language to avoid hallucinations in other languages (auto-detect or pick from 17 languages)
+- **Language selector** — set STT language to avoid hallucinations (17 languages)
 - **Voice picker** — choose from 11 Kokoro voices across 8 languages (no server restart needed)
 - **Voice detail** — set VOICE tag verbosity: Brief (1 sentence), Natural (1-3), or Detailed (4-6)
 - **Start on startup** — optional login item to launch automatically when you log in
@@ -65,6 +65,10 @@ Built-in speech-to-text using your local Whisper server. Press **Ctrl** to start
 
 Both features are in the **Automation** section of the menubar and require **Accessibility permission** (macOS will prompt you on first use).
 
+#### Auto-Focus
+
+Enable **Auto-Focus** to automatically bring a specific app to the front when you finish speaking. Pick from 15 apps (VS Code, Cursor, Windsurf, Zed, Xcode, Sublime Text, Nova, Fleet, Claude, Terminal, iTerm2, Warp, Alacritty, Ghostty) or select **CUSTOM** to type any app name. Uses native `NSRunningApplication.activate()` — no System Events permission needed.
+
 #### Auto-Submit
 
 Enable **Auto-Submit** to submit messages by voice. Say one of these trigger words at the end of your phrase:
@@ -74,10 +78,6 @@ Enable **Auto-Submit** to submit messages by voice. Say one of these trigger wor
 Example: *"fix the login bug, submit"* → types "fix the login bug" and presses Cmd+Enter.
 
 **Barge-in:** Any currently playing TTS audio is automatically interrupted when you start recording (press Ctrl) or when Auto-Submit triggers, so you can speak without waiting for Claude to finish talking.
-
-#### Auto-Focus
-
-Enable **Auto-Focus** to automatically bring a specific app to the front when you finish speaking. Pick from 15 apps (VS Code, Cursor, Windsurf, Zed, Xcode, Sublime Text, Nova, Fleet, Claude, Terminal, iTerm2, Warp, Alacritty, Ghostty) or select **CUSTOM** to type any app name. Uses native `NSRunningApplication.activate()` — no System Events permission needed.
 
 ### Fallback: macOS Dictation
 
@@ -97,6 +97,16 @@ Here's the full code with detailed explanation...
 - **Speakers**: You hear only the short spoken summary
 - The hook script extracts the tag, sends it to Kokoro TTS, and plays the audio
 - If there's no `[VOICE:]` tag, the hook falls back to stripping markdown and reading the raw text (truncated to ~600 chars)
+
+### Voice Detail Levels
+
+Choose how verbose the spoken summary is (set in the menubar under **Detail**):
+
+| Level | Sentences | Description |
+|-------|-----------|-------------|
+| **Brief** | 1 | Just the key outcome |
+| **Natural** | 1-3 | Conversational summary (default) |
+| **Detailed** | 4-6 | Thorough explanation of what changed, why, and what to do next |
 
 ## Configuration
 
@@ -240,6 +250,7 @@ Contributions are welcome! Feel free to open issues or submit pull requests. Whe
 - [MLX Audio](https://github.com/Blaizzy/mlx-audio) — TTS and STT on Apple Silicon
 - [Kokoro](https://huggingface.co/prince-canuma/Kokoro-82M) — TTS model
 - [Claude Code](https://claude.ai/claude-code) — Anthropic's CLI
+- [Codex CLI](https://github.com/openai/codex) — OpenAI's CLI agent
 
 ## License
 
