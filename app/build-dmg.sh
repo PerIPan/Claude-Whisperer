@@ -1,22 +1,22 @@
 #!/bin/bash
-# Build Claude Whisperer .app bundle and package as .dmg
+# Build Open Whisperer .app bundle and package as .dmg
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$SCRIPT_DIR/.build"
-APP_NAME="ClaudeWhisperer"
+APP_NAME="OpenWhisperer"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
-DMG_NAME="ClaudeWhisperer-1.2.2"
+DMG_NAME="OpenWhisperer-1.2.2"
 
-echo "=== Building Claude Whisperer ==="
+echo "=== Building Open Whisperer ==="
 
 # Step 1: Build Swift binary
 echo "Compiling Swift..."
 cd "$SCRIPT_DIR"
 swift build -c release 2>&1
 
-BINARY="$SCRIPT_DIR/.build/release/ClaudeWhisperer"
+BINARY="$SCRIPT_DIR/.build/release/OpenWhisperer"
 if [ ! -f "$BINARY" ]; then
     echo "Error: Build failed — binary not found"
     exit 1
@@ -31,7 +31,7 @@ mkdir -p "$APP_BUNDLE/Contents/Resources/servers"
 mkdir -p "$APP_BUNDLE/Contents/Resources/scripts"
 
 # Copy binary
-cp "$BINARY" "$APP_BUNDLE/Contents/MacOS/ClaudeWhisperer"
+cp "$BINARY" "$APP_BUNDLE/Contents/MacOS/OpenWhisperer"
 
 # Copy Info.plist, icon, and fonts
 cp "$SCRIPT_DIR/Resources/Info.plist" "$APP_BUNDLE/Contents/"
@@ -111,4 +111,4 @@ echo "=== Done ==="
 echo "DMG: $DMG_OUTPUT"
 echo "App: $APP_BUNDLE"
 echo ""
-echo "To install: open the DMG and drag ClaudeWhisperer to Applications"
+echo "To install: open the DMG and drag OpenWhisperer to Applications"

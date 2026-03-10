@@ -37,7 +37,7 @@ echo "Press Ctrl+C to stop servers."
 cleanup() {
   echo "Shutting down..."
   kill "$STT_PID" "$TTS_PID" 2>/dev/null
-  rm -f "$HOME/Library/Application Support/ClaudeWhisperer/tts_playing.lock" "$HOME/Library/Application Support/ClaudeWhisperer/tts_hook.pid"
+  rm -f "$HOME/Library/Application Support/OpenWhisperer/tts_playing.lock" "$HOME/Library/Application Support/OpenWhisperer/tts_hook.pid"
   wait 2>/dev/null
   echo "Done."
   exit 0

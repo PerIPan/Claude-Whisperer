@@ -1,11 +1,11 @@
 import Foundation
 
 enum Paths {
-    /// ~/Library/Application Support/ClaudeWhisperer
+    /// ~/Library/Application Support/OpenWhisperer
     static let appSupport: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
-        return base.appendingPathComponent("ClaudeWhisperer")
+        return base.appendingPathComponent("OpenWhisperer")
     }()
 
     /// Python venv location

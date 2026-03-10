@@ -307,7 +307,7 @@ enum ConfigManager {
 
     static func checkCodexHookConfigured() -> Bool {
         guard let content = try? String(contentsOf: Paths.codexConfig, encoding: .utf8) else { return false }
-        return content.contains("codex-tts-hook") || content.contains("ClaudeWhisperer")
+        return content.contains("codex-tts-hook") || content.contains("OpenWhisperer")
     }
 
     static func checkCodexAgentsMdConfigured() -> Bool {
@@ -363,13 +363,11 @@ enum ConfigManager {
 
     // MARK: - Auto-apply hook to settings.json
 
-    /// Patterns that identify any Claude Whisper/Whisperer TTS hook command
+    /// Patterns that identify any Open Whisperer TTS hook command
     private static let hookPatterns = [
         "tts-hook.sh",
-        "Claude Whisper",
-        "Claude Whisperer",
-        "ClaudeWhisper",
-        "ClaudeWhisperer",
+        "Open Whisperer",
+        "OpenWhisperer",
         "mlx-openai-whisper",
     ]
 

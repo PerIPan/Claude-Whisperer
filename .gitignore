@@ -1,0 +1,26 @@
+# Build artifacts
+app/.build/
+*.dmg
+
+# Python venv (project root has a venv from setup.sh)
+bin/
+lib/
+share/
+include/
+pyvenv.cfg
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# macOS
+.DS_Store
+CACHEDIR.TAG
+.lock
+
+# Legacy root-level hook (real one is in hooks/)
+/tts-hook.sh
+
+# IDE
+*.xcodeproj
+*.xcworkspace

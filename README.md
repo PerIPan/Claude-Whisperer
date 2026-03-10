@@ -1,9 +1,9 @@
-# Claude Whisperer
+# Open Whisperer
 
 Full interactive Voice mode for [Claude Code](https://claude.ai/claude-code) and [Codex CLI](https://github.com/openai/codex) on Apple Silicon. Talk to your AI, hear it talk back — all running locally on your Mac. Built-in push-to-talk dictation, Auto-Focus & easy setup. Open Source.
 
 <p align="center">
-  <img src="screenshot.png" width="320" alt="Claude Whisperer menubar app">
+  <img src="screenshot.png" width="320" alt="Open Whisperer menubar app">
 </p>
 
 ## What It Does
@@ -14,7 +14,7 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ## Install
 
-[**Download ClaudeWhisperer-1.2.2.dmg**](https://github.com/PerIPan/Claude-Whisperer/releases/download/v1.2.2/ClaudeWhisperer-1.2.2.dmg) — drag to Applications and launch.
+[**Download OpenWhisperer-1.2.2.dmg**](https://github.com/PerIPan/OpenWhisperer/releases/download/v1.2.2/OpenWhisperer-1.2.2.dmg) — drag to Applications and launch.
 
 On first launch, the app:
 - Creates a Python environment with all dependencies
@@ -51,7 +51,7 @@ Built-in speech-to-text using your local Whisper server. Press **Ctrl** to start
 4. Transcribed text is inserted into the focused app via Accessibility (native apps) or clipboard paste (all others)
 
 <p align="center">
-  <img src="screenshot2.png" width="480" alt="Claude Whisperer transcription overlay">
+  <img src="screenshot2.png" width="480" alt="Open Whisperer transcription overlay">
 </p>
 
 ### Requirements
@@ -71,13 +71,9 @@ Enable **Auto-Focus** to automatically bring a specific app to the front when yo
 
 #### Auto-Submit
 
-Enable **Auto-Submit** to submit messages by voice. Say one of these trigger words at the end of your phrase:
+Enable **Auto-Submit** to automatically submit after every transcription — no trigger word needed. The transcribed text is typed and Enter is pressed.
 
-- "submit", "send", "send it", "go ahead", "enter"
-
-Example: *"fix the login bug, submit"* → types "fix the login bug" and presses Cmd+Enter.
-
-**Barge-in:** Any currently playing TTS audio is automatically interrupted when you start recording (press Ctrl) or when Auto-Submit triggers, so you can speak without waiting for Claude to finish talking.
+**Barge-in:** Any currently playing TTS audio is automatically interrupted when you start recording (press Ctrl) or when Auto-Submit triggers, so you can speak without waiting for the AI to finish talking.
 
 ### Fallback: macOS Dictation
 
@@ -122,7 +118,7 @@ Choose how verbose the spoken summary is (set in the menubar under **Detail**):
 
 ## Troubleshooting
 
-**No audio after Claude responds:**
+**No audio after response:**
 1. Check TTS server is running: `curl http://localhost:8000/models`
 2. Test TTS directly: `echo "hello" | ./scripts/speak.sh`
 3. Check the hook path in `settings.json` is correct and absolute
@@ -159,8 +155,8 @@ Choose how verbose the spoken summary is (set in the menubar under **Detail**):
 ### Step 1: Install
 
 ```bash
-git clone https://github.com/PerIPan/Claude-Whisperer.git
-cd Claude-Whisperer
+git clone https://github.com/PerIPan/OpenWhisperer.git
+cd OpenWhisperer
 chmod +x setup.sh && ./setup.sh
 ```
 
@@ -199,7 +195,7 @@ Add this to your `~/.claude/settings.json` (or your project's `.claude/settings.
         "hooks": [
           {
             "type": "command",
-            "command": "/absolute/path/to/Claude-Whisperer/hooks/tts-hook.sh",
+            "command": "/absolute/path/to/OpenWhisperer/hooks/tts-hook.sh",
             "timeout": 60
           }
         ]
@@ -209,7 +205,7 @@ Add this to your `~/.claude/settings.json` (or your project's `.claude/settings.
 }
 ```
 
-Replace `/absolute/path/to/Claude-Whisperer` with where you cloned the repo (e.g. `/Users/yourname/Claude-Whisperer`).
+Replace `/absolute/path/to/OpenWhisperer` with where you cloned the repo (e.g. `/Users/yourname/OpenWhisperer`).
 
 ### Building the App from Source
 
@@ -219,12 +215,12 @@ chmod +x build-dmg.sh
 ./build-dmg.sh
 ```
 
-Requires Xcode Command Line Tools. Produces `Claude Whisperer.app` and `ClaudeWhisperer-1.2.2.dmg` in `app/.build/`.
+Requires Xcode Command Line Tools. Produces `Open Whisperer.app` and `OpenWhisperer-1.2.2.dmg` in `app/.build/`.
 
 ## File Structure
 
 ```
-Claude-Whisperer/
+OpenWhisperer/
 ├── CLAUDE.md              # Copy to your project (tells Claude to add VOICE tags)
 ├── setup.sh               # One-click installer
 ├── hooks/

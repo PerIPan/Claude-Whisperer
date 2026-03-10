@@ -29,10 +29,10 @@ MODEL = os.getenv("WHISPER_MODEL", "mlx-community/whisper-large-v3-turbo")
 
 # Auto-submit: flag file toggled by the menubar app
 AUTO_SUBMIT_FLAG = os.path.expanduser(
-    "~/Library/Application Support/ClaudeWhisperer/auto_submit"
+    "~/Library/Application Support/OpenWhisperer/auto_submit"
 )
 AUTO_FOCUS_APP = os.path.expanduser(
-    "~/Library/Application Support/ClaudeWhisperer/auto_focus_app"
+    "~/Library/Application Support/OpenWhisperer/auto_focus_app"
 )
 SUBMIT_TRIGGERS = ["submit", "send it", "go ahead", "send", "enter"]
 
@@ -48,7 +48,7 @@ _transcribe_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tra
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
 # TTS PID/lock files in per-user app support dir instead of /tmp
-_APP_SUPPORT = os.path.expanduser("~/Library/Application Support/ClaudeWhisperer")
+_APP_SUPPORT = os.path.expanduser("~/Library/Application Support/OpenWhisperer")
 TTS_PIDFILE = os.path.join(_APP_SUPPORT, "tts_hook.pid")
 TTS_LOCKFILE = os.path.join(_APP_SUPPORT, "tts_playing.lock")
 

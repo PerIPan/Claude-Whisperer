@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:mlx-openai-whisper}/app",
+            "name": "Debug OpenWhisperer (app)",
+            "target": "OpenWhisperer",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug OpenWhisperer (app)"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:mlx-openai-whisper}/app",
+            "name": "Release OpenWhisperer (app)",
+            "target": "OpenWhisperer",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release OpenWhisperer (app)"
+        }
+    ]
+}

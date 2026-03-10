@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "ClaudeWhisperer",
+    name: "OpenWhisperer",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "ClaudeWhisperer",
-            path: "Sources/ClaudeWhisperer"
+            name: "OpenWhisperer",
+            path: "Sources/OpenWhisperer"
         )
     ]
 )

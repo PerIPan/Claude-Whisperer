@@ -106,7 +106,7 @@ struct MenuBarView: View {
                         .resizable()
                         .frame(width: 32, height: 32)
                 }
-                Text("Claude Whisperer")
+                Text("Open Whisperer")
                     .font(.custom("Outfit", size: 16).weight(.semibold))
             }
             .padding(.bottom, 4)
@@ -186,12 +186,6 @@ struct MenuBarView: View {
                     try? FileManager.default.removeItem(at: Paths.autoFocusApp)
                 }
             }
-
-            // Info text below checkboxes
-            Text("say \"submit\" or \"send\" at end of phrase")
-                .font(.custom("Outfit", size: 10))
-                .foregroundColor(.secondary)
-                .padding(.leading, 2)
 
             if autoFocusEnabled {
                 Picker("", selection: $focusSelection) {
