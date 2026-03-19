@@ -10,6 +10,15 @@ Full interactive Voice mode for [Claude Code](https://claude.ai/claude-code) and
   <img src="screenshot.png" width="320" alt="Open Whisperer menubar app">
 </p>
 
+Build from source or DMG, do not pay the 99/year so you would have to allow it to run.
+
+The command to bypass Gatekeeper for the DMG:
+xattr -cr /Applications/Open\ Whisperer.app
+
+If you want to do it on the DMG itself before opening:
+xattr -d com.apple.quarantine ~/Downloads/OpenWhisperer-1.3.2.dmg
+
+
 ## What It Does
 
 You use Claude Code or Codex CLI normally. After every response, the AI's answer is automatically spoken aloud through your Mac's speakers using a local TTS model. Three voice input modes: **Press-to-Talk** (press hotkey to start/stop), **Hold-to-Talk** (hold hotkey to record, release to transcribe), or **Hands-Free** (say "initiate" to start recording, 3s silence auto-transcribes, say "hold on" to interrupt TTS).
