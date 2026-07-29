@@ -114,3 +114,28 @@ struct OWWindowBackground: NSViewRepresentable {
         window.backgroundColor = .ow(0xFAF7F1, 0x1E1B16)
     }
 }
+
+// MARK: - Brand fonts
+
+enum OWFont {
+    /// Brand serif for the wordmark + titled headers. The bundled cut is a single SemiBold static
+    /// face (family "Fraunces SemiBold"), so the weight is intrinsic — no `.weight()` needed.
+    static func title(_ size: CGFloat = 15) -> Font {
+        .custom("Fraunces SemiBold", size: size)
+    }
+    static func serif(_ size: CGFloat = 15) -> Font {
+        .custom("Fraunces SemiBold", size: size)
+    }
+    static func sectionLabel(_ size: CGFloat = 11) -> Font {
+        .custom("Outfit", size: size).weight(.semibold)
+    }
+    static func body(_ size: CGFloat = 13) -> Font {
+        .custom("Outfit", size: size)
+    }
+    static func caption(_ size: CGFloat = 10) -> Font {
+        .custom("Outfit", size: size)
+    }
+    static func mono(_ size: CGFloat = 11) -> Font {
+        .custom("Outfit", size: size).monospaced()
+    }
+}
