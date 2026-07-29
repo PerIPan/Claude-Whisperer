@@ -62,6 +62,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if setupManager.isSetupComplete {
             serverManager.startAll()
         } else {
+            // First run: the menubar is only a small dropdown now, so nothing would
+            // surface the setup/model progress on its own. Open Settings on General
+            // (which hosts those banners) so the user sees what's happening.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self else { return }
+                SettingsWindow.show(tab: .general, appDelegate: self)
+            }
             setupManager.runFirstLaunchSetup { [weak self] success in
                 guard success else { return }
                 // startAll must run on main thread (BUG-11: timer + process management)

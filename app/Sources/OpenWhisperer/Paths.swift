@@ -28,9 +28,9 @@ enum Paths {
 
     /// Card expanded states (persisted so the branded popover's collapse/expand survives
     /// restarts). Restored 2026-07-19 with the branded popover UI.
-    static let setupCardExpanded = appSupport.appendingPathComponent("setup_expanded")
-    static let voiceSettingsCardExpanded = appSupport.appendingPathComponent("voice_settings_expanded")
-    static let serverCardExpanded = appSupport.appendingPathComponent("server_expanded")
+    // The collapsible-card expand prefs (setup_expanded / voice_settings_expanded /
+    // server_expanded) died with the pop-over — the tabbed Settings window has no
+    // collapsible cards. Removed 2026-07-20.
 
     /// Legacy model space from the removed WhisperKit engine (2026-07-13). Nothing
     /// downloads here anymore; ModelStorage lists it so "Delete models" reclaims an

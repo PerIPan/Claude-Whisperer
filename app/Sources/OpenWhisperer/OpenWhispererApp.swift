@@ -55,32 +55,60 @@ struct OpenWhispererApp: App {
     }
 
     var body: some Scene {
+        // Plain menu dropdown — the settings themselves live in the branded
+        // SettingsWindow (see Settings/SettingsWindow.swift).
         MenuBarExtra {
-            MenuBarView()
-                .environmentObject(appDelegate.serverManager)
-                .environmentObject(appDelegate.setupManager)
-                .environmentObject(appDelegate.dictationManager)
-                .environmentObject(appDelegate.accessibilityManager)
-                .onAppear {
-                    appDelegate.setupDictation()
-                }
+            MenuBarMenu(appDelegate: appDelegate)
         } label: {
             // Always-visible first-run signal: hourglass while the models load, waveform once ready.
-            MenuBarStatusIcon(dictation: appDelegate.dictationManager, server: appDelegate.serverManager)
+            MenuBarStatusIcon(dictation: appDelegate.dictationManager,
+                              server: appDelegate.serverManager,
+                              accessibility: appDelegate.accessibilityManager)
         }
-        .menuBarExtraStyle(.window)
+    }
+}
+
+/// Menubar dropdown contents.
+private struct MenuBarMenu: View {
+    let appDelegate: AppDelegate
+    @ObservedObject private var overlay = TranscriptionOverlay.shared
+
+    var body: some View {
+        Button("Settings…") {
+            SettingsWindow.show(appDelegate: appDelegate)
+        }
+        .keyboardShortcut(",", modifiers: .command)
+
+        Toggle("Show Overlay", isOn: Binding(
+            get: { overlay.isVisible },
+            set: { $0 ? overlay.show() : overlay.hide() }
+        ))
+
+        Divider()
+
+        Button("Quit Open Whisperer") { NSApplication.shared.terminate(nil) }
+            .keyboardShortcut("q", modifiers: .command)
     }
 }
 
 /// The menu-bar icon. Shows an hourglass while a model is still loading (most visible on the
 /// very first launch), a speaker while a dictated turn is armed to be spoken (the will-speak
-/// indicator), and the waveform otherwise.
+/// indicator), an exclamation badge when a required permission is missing, and the waveform
+/// otherwise. The badge is the only permission signal visible with the window closed.
 private struct MenuBarStatusIcon: View {
     @ObservedObject var dictation: DictationManager
     @ObservedObject var server: ServerManager
+    @ObservedObject var accessibility: AccessibilityManager
 
     var body: some View {
         let loading = (!dictation.sttModelReady && !dictation.sttFailed) || server.status == .starting
-        Image(systemName: loading ? "hourglass" : (dictation.speakArmed ? "speaker.wave.2" : "waveform"))
+        let needsGrant = !accessibility.isGranted || !dictation.recorder.micPermission
+        if loading {
+            Image(systemName: "hourglass")
+        } else if needsGrant {
+            Image(systemName: "exclamationmark.triangle")
+        } else {
+            Image(systemName: dictation.speakArmed ? "speaker.wave.2" : "waveform")
+        }
     }
 }

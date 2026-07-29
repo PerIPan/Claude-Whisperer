@@ -38,7 +38,7 @@ extension Color {
 
 // Warm "Open Whisperer" palette (openwhisperer.com). Tokens are light/dark dynamic —
 // via the `Color.ow(light, dark)` helper above. Used by the branded menubar popover
-// (MenuBarView) and the transcription overlay.
+// (the tabbed Settings window) and the transcription overlay.
 enum OWColor {
     // Surfaces
     static let page = Color.ow(0xFAF7F1, 0x1E1B16)            // popover / overlay background (cream / warm-dark)
