@@ -96,6 +96,42 @@ resolve_flavor() {
   fi
 }
 
+# Reply language for the multilingual (Supertonic) voices. A Dutch voice reading English text is
+# pointless, so when one of those voices is active we tell the model to write the spoken summary
+# in that language. The language rides inside the voice id (`supertonic:<lang>:<style>`), so this
+# is a plain code→name lookup rather than the first-char scheme resolve_flavor uses for Kokoro.
+#
+# Like the persona map, this lives ONLY here — no Swift parity pair — and HookTests is its guard.
+# Kokoro voices are unaffected (their language is implied by the voice and the model already
+# replies in the user's language); `en` gets no line since English is the default.
+resolve_language_line() {
+  local voice="$OW_TTS_VOICE"
+  [ -z "$voice" ] && voice=$(cat "$APP_SUPPORT/tts_voice" 2>/dev/null)
+  voice=$(printf '%s' "$voice" | tr -d '[:space:]')
+  case "$voice" in
+    supertonic:*|SUPERTONIC:*) ;;
+    *) echo ""; return ;;
+  esac
+  local code language
+  code=$(printf '%s' "$voice" | cut -d: -f2 | tr '[:upper:]' '[:lower:]')
+  case "$code" in
+    nl) language="Dutch" ;;      de) language="German" ;;      pl) language="Polish" ;;
+    ru) language="Russian" ;;    uk) language="Ukrainian" ;;   fr) language="French" ;;
+    it) language="Italian" ;;    es) language="Spanish" ;;     pt) language="Portuguese" ;;
+    hi) language="Hindi" ;;      ja) language="Japanese" ;;    ko) language="Korean" ;;
+    ar) language="Arabic" ;;     bg) language="Bulgarian" ;;   cs) language="Czech" ;;
+    da) language="Danish" ;;     el) language="Greek" ;;       et) language="Estonian" ;;
+    fi) language="Finnish" ;;    hr) language="Croatian" ;;    hu) language="Hungarian" ;;
+    id) language="Indonesian" ;; lt) language="Lithuanian" ;;  lv) language="Latvian" ;;
+    ro) language="Romanian" ;;   sk) language="Slovak" ;;      sl) language="Slovenian" ;;
+    sv) language="Swedish" ;;    tr) language="Turkish" ;;
+    *) echo ""; return ;;
+  esac
+  # Sentinel phrase kept distinct from resolve_flavor's "voice speaking your reply" so the two
+  # layers stay independently assertable in HookTests.
+  echo " Write the text you pass to \`speak\` in ${language}, not English — that is the language the selected voice speaks. Your on-screen reply stays in the language of the conversation."
+}
+
 # Speak tool args → tell the model the exact voice/speed to pass to `speak` to prevent guesswork.
 # We always explicitly instruct the model to pass the active voice (global or overridden).
 resolve_speak_args() {
@@ -114,15 +150,16 @@ resolve_speak_args() {
 # Build the full nudge sentence. $1 = IS_VOICE (0/1).
 build_nudge() {
   local is_voice="$1"
-  local len flavor speak_args prefix
+  local len flavor speak_args lang_line prefix
   len=$(resolve_length_phrase)
   flavor=$(resolve_flavor)
   speak_args=$(resolve_speak_args)
+  lang_line=$(resolve_language_line)
   if [ "$is_voice" -eq 1 ]; then
     prefix="This turn was dictated by voice."
   else
     prefix="This reply should be spoken aloud."
   fi
-  printf '%s Before writing your on-screen reply, your FIRST action must be to call the `speak` tool exactly once, passing %s that summarizes your answer and stands alone when heard.%s Then write your full reply on screen as usual. Do not skip the speak call, and do not mention the tool in your written reply.%s' \
-    "$prefix" "$len" "$speak_args" "$flavor"
+  printf '%s Before writing your on-screen reply, your FIRST action must be to call the `speak` tool exactly once, passing %s that summarizes your answer and stands alone when heard.%s Then write your full reply on screen as usual. Do not skip the speak call, and do not mention the tool in your written reply.%s%s' \
+    "$prefix" "$len" "$speak_args" "$flavor" "$lang_line"
 }

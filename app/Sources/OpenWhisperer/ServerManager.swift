@@ -18,7 +18,7 @@ class ServerManager: ObservableObject {
     @Published var ttsModel: String = "kokoro-82m"              // native FluidAudio
     @Published var lastError: String = ""
 
-    private let tts = KokoroTTS()
+    private let tts = TTSEngines()
     /// In-process TTS playback (Phase 3). Shared with `DictationManager` (via `AppDelegate`) for
     /// instant barge-in, and with `TTSHTTPServer` to serve `/v1/audio/play`.
     let playback: TTSPlaybackController

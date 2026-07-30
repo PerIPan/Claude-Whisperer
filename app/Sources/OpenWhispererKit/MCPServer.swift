@@ -57,7 +57,7 @@ public struct MCPServer {
                     "type": "object",
                     "properties": [
                         "text": ["type": "string", "description": "The text to speak aloud."],
-                        "voice": ["type": "string", "description": "Optional Kokoro voice id (e.g., 'af_heart', 'bf_emma', 'jf_alpha'). Discover available IDs using list_voices. Pass different voice IDs in consecutive speak calls to script multi-character dialogue without external code."],
+                        "voice": ["type": "string", "description": "Optional voice id: either a Kokoro id (e.g., 'af_heart', 'bf_emma', 'jf_alpha') or a multilingual id of the form 'supertonic:<lang>:<style>' (e.g., 'supertonic:nl:F1' for Dutch), which speaks languages Kokoro has no voice for. Discover available IDs using list_voices. Pass different voice IDs in consecutive speak calls to script multi-character dialogue without external code."],
                         "speed": ["type": "number", "description": "Optional playback speed, 0.7–1.5; defaults to the user's setting."],
                     ],
                     "required": ["text"],
@@ -132,6 +132,17 @@ public struct MCPServer {
         guard let raw else { return nil }
         let voice = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !voice.isEmpty else { return nil }
+
+        // Multilingual (Supertonic) ids carry an explicit engine tag and contain characters the
+        // Kokoro shape check below rejects (`:`, uppercase style). Validate them through the
+        // router instead and return the canonical spelling, so a `supertonic:NL:f1` from a
+        // per-project override isn't silently dropped back to the global voice.
+        if voice.lowercased().hasPrefix(TTSVoiceRouter.supertonicPrefix) {
+            let route = TTSVoiceRouter.route(voice)
+            guard route.engine == .supertonic, let language = route.language else { return nil }
+            return TTSVoiceRouter.supertonicID(language: language, style: route.voice)
+        }
+
         let chars = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789_")
         guard voice.rangeOfCharacter(from: chars.inverted) == nil,
               let underscore = voice.firstIndex(of: "_"),

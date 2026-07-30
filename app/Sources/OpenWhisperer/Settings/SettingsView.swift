@@ -12,7 +12,7 @@ struct SettingsView: View {
     /// rather than derived from each tab: sizing to content clipped the tallest tab
     /// (Dictation) and made the window jump on every switch. With a fixed height the
     /// ScrollView below has an unambiguous ideal size, so nothing is ever cut off.
-    static let contentWidth: CGFloat = 520
+    static let contentWidth: CGFloat = 480
     static let contentHeight: CGFloat = 620
 
     /// Owned by `SettingsWindow` so re-opening can switch tabs on a live window.

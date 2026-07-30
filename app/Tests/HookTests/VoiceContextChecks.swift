@@ -290,5 +290,74 @@ func voiceContextFailures() -> [String] {
         }
     }
 
+    // --- Reply language for the multilingual (Supertonic) voices ---
+    // A Dutch voice reading English text is the bug this layer exists to prevent, so the nudge
+    // must tell the model to write the spoken summary in the voice's language. Sentinel:
+    // "Write the text you pass to `speak` in" — deliberately distinct from the persona sentinel.
+    let langSentinel = "Write the text you pass to `speak` in"
+
+    // 28) Dutch voice → nudge carries the "write it in Dutch" instruction and the full voice id.
+    do {
+        let s = newSandbox()
+        s.writeVoiceTurn(forPrompt: "go"); s.writeTtsVoice("supertonic:nl:F1")
+        let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"), sandbox: s).stdout)
+        if n?.contains(langSentinel) != true { fail("dutchLanguageLine: missing: \(n?.debugDescription ?? "nil")") }
+        if n?.contains("in Dutch, not English") != true { fail("dutchLanguageLine: language not named Dutch") }
+        if n?.contains("voice=\"supertonic:nl:F1\"") != true { fail("dutchLanguageLine: speak voice arg lost") }
+        if n?.contains("`speak` tool") != true { fail("dutchLanguageLine: base nudge lost") }
+    }
+
+    // 29) another language routes to its own name (not hard-coded to Dutch).
+    do {
+        let s = newSandbox()
+        s.writeVoiceTurn(forPrompt: "go"); s.writeTtsVoice("supertonic:uk:M1")
+        let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"), sandbox: s).stdout)
+        if n?.contains("in Ukrainian, not English") != true { fail("ukrainianLanguageLine: \(n?.debugDescription ?? "nil")") }
+    }
+
+    // 30) a multilingual voice gets NO persona — personas are keyed to Kokoro's first-char scheme
+    //     and the language instruction takes their place.
+    do {
+        let s = newSandbox()
+        s.writeVoiceTurn(forPrompt: "go"); s.writeTtsVoice("supertonic:de:F1")
+        let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"), sandbox: s).stdout)
+        if n?.contains("voice speaking your reply") == true { fail("supertonicNoPersona: unexpected persona") }
+        if n?.contains("in German, not English") != true { fail("supertonicNoPersona: language line missing") }
+    }
+
+    // 31) a Kokoro voice gets NO language line — English users see zero change.
+    do {
+        let s = newSandbox()
+        s.writeVoiceTurn(forPrompt: "go"); s.writeTtsVoice("af_heart")
+        let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"), sandbox: s).stdout)
+        if n?.contains(langSentinel) == true { fail("kokoroNoLanguageLine: unexpected language line") }
+    }
+
+    // 32) English Supertonic gets no language line either (English is already the default).
+    do {
+        let s = newSandbox()
+        s.writeVoiceTurn(forPrompt: "go"); s.writeTtsVoice("supertonic:en:F1")
+        let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"), sandbox: s).stdout)
+        if n?.contains(langSentinel) == true { fail("supertonicEnglishNoLine: unexpected language line") }
+    }
+
+    // 33) the language line follows OW_TTS_VOICE, matching how the persona layer behaves.
+    do {
+        let s = newSandbox(); s.writeVoiceTurn(forPrompt: "go"); s.writeTtsVoice("af_heart")
+        let r = Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"),
+                         sandbox: s, env: ["OW_TTS_VOICE": "supertonic:pl:F1"])
+        let n = nudge(r.stdout)
+        if n?.contains("in Polish, not English") != true { fail("languageFollowsOverride: \(n?.debugDescription ?? "nil")") }
+        if n?.contains("voice speaking your reply") == true { fail("languageFollowsOverride: unexpected persona from global") }
+    }
+
+    // 34) an unknown language code yields no line rather than a broken sentence.
+    do {
+        let s = newSandbox()
+        s.writeVoiceTurn(forPrompt: "go"); s.writeTtsVoice("supertonic:xx:F1")
+        let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"), sandbox: s).stdout)
+        if n?.contains(langSentinel) == true { fail("unknownLanguageNoLine: unexpected language line") }
+    }
+
     return failures
 }

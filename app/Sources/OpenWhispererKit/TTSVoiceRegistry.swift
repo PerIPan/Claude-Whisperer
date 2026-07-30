@@ -102,7 +102,36 @@ public enum TTSVoiceRegistry {
             TTSVoice(id: "zm_yunxia", name: "Yunxia", language: "Chinese", region: "CN", gender: "Male"),
             TTSVoice(id: "zm_yunyang", name: "Yunyang", language: "Chinese", region: "CN", gender: "Male")
         ])
-    ]
+    ] + supertonicGroups
+
+    /// Languages Kokoro-82M cannot speak at all, served by Supertonic-3 instead. Kokoro renders
+    /// these as an English voice reading foreign text — measurably unintelligible (a Dutch ASR
+    /// read-back of Kokoro's Dutch scores ~100% WER; Supertonic-3's scores ~4%).
+    ///
+    /// Curated deliberately. All 31 Supertonic languages ride in the one model, so this list
+    /// costs nothing to extend — it's a UI-clutter decision, not a bytes decision, and these
+    /// five are the ones whose output has been listened to and ASR-verified. A power user can
+    /// name any language `TTSVoiceRouter.supertonicLanguages` accepts via `OW_TTS_VOICE`.
+    ///
+    /// Two styles each (one female, one male) rather than all ten: F1–F5/M1–M5 are generic
+    /// speaker styles, not per-language accents, so eight more rows per language would add
+    /// length without adding meaningful choice.
+    static let supertonicGroups: [TTSVoiceGroup] = [
+        ("Dutch", "nl", "NL"),
+        ("German", "de", "DE"),
+        ("Polish", "pl", "PL"),
+        ("Russian", "ru", "RU"),
+        ("Ukrainian", "uk", "UA"),
+    ].map { label, code, region in
+        TTSVoiceGroup(name: label, voices: [
+            TTSVoice(
+                id: TTSVoiceRouter.supertonicID(language: code, style: "F1"),
+                name: "F1", language: label, region: region, gender: "Female"),
+            TTSVoice(
+                id: TTSVoiceRouter.supertonicID(language: code, style: "M1"),
+                name: "M1", language: label, region: region, gender: "Male"),
+        ])
+    }
 
     public static var allVoices: [TTSVoice] {
         groups.flatMap { $0.voices }

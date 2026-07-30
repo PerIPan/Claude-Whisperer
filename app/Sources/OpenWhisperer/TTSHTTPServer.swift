@@ -13,12 +13,12 @@ import OpenWhispererKit
 /// One request per connection (`Connection: close`), which is all `curl` (the hook) needs.
 final class TTSHTTPServer {
     private let port: NWEndpoint.Port
-    private let tts: KokoroTTS
+    private let tts: TTSEngines
     private let playback: TTSPlaybackController
     private let queue = DispatchQueue(label: "tts.http.server")
     private var listener: NWListener?
 
-    init(port: UInt16, tts: KokoroTTS, playback: TTSPlaybackController) {
+    init(port: UInt16, tts: TTSEngines, playback: TTSPlaybackController) {
         self.port = NWEndpoint.Port(rawValue: port)!
         self.tts = tts
         self.playback = playback
@@ -138,10 +138,18 @@ final class TTSHTTPServer {
             // Minimal MCP over Streamable HTTP. All JSON-RPC shaping is pure (OpenWhispererKit);
             // here we only map the outcome onto HTTP and perform the one side effect (playback).
             let isVoiceCached: (String) -> Bool = { voice in
+                let home = FileManager.default.homeDirectoryForCurrentUser
+                // Multilingual voices share one Supertonic model across every language and
+                // style, so cache state is per-model, not per-voice: all of them flip to
+                // cached together once the pipeline is on disk.
+                if TTSVoiceRouter.isSupertonic(voice) {
+                    let marker = home.appendingPathComponent(
+                        ".cache/fluidaudio/Models/supertonic-3/TextEncoder.mlmodelc").path
+                    return FileManager.default.fileExists(atPath: marker)
+                }
                 let sanitized = voice.filter { $0.isLetter || $0.isNumber || $0 == "_" }
                 guard !sanitized.isEmpty else { return false }
                 if sanitized == "af_heart" { return true }
-                let home = FileManager.default.homeDirectoryForCurrentUser
                 let path = home.appendingPathComponent(".cache/fluidaudio/Models/kokoro-82m-coreml/ANE/\(sanitized).bin").path
                 guard FileManager.default.fileExists(atPath: path) else { return false }
                 let attrs = try? FileManager.default.attributesOfItem(atPath: path)

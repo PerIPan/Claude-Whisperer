@@ -8,7 +8,7 @@ import OpenWhispererKit
 /// state (overlay waveform + hands-free mic-muting). Barge-in cancels pending synthesis — freeing
 /// the ANE for STT — and stops audio instantly.
 actor TTSPlaybackController {
-    private let tts: KokoroTTS
+    private let tts: TTSEngines
     private let engine = AudioPlaybackEngine()
     private var playTask: Task<Void, Never>?
 
@@ -28,7 +28,7 @@ actor TTSPlaybackController {
     private var activeItemGen = 0
     private var synthDone = false
 
-    init(tts: KokoroTTS) {
+    init(tts: TTSEngines) {
         self.tts = tts
     }
 

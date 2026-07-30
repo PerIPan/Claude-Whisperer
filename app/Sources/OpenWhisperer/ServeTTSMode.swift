@@ -5,7 +5,7 @@ import Foundation
 /// native TTS path with `curl` and for CI; the real GUI hosts the same pieces via `ServerManager`.
 enum ServeTTSMode {
     static func run() {
-        let tts = KokoroTTS()
+        let tts = TTSEngines()
         let playback = TTSPlaybackController(tts: tts)
         let port = UInt16(ProcessInfo.processInfo.environment["TTS_PORT"] ?? "") ?? 8000
         let server = TTSHTTPServer(port: port, tts: tts, playback: playback)

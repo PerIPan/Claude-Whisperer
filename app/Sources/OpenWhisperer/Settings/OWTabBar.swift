@@ -106,16 +106,6 @@ private struct OWTabButton: View {
                     .fill(isSelected ? OWColor.accent
                                      : (isHovered ? OWColor.pillFill : Color.clear))
             )
-            // A tinted fill can't recolor a bitmap logo, so give the logo tab a second
-            // selection cue that doesn't rely on foregroundColor.
-            .overlay(alignment: .bottom) {
-                if isSelected && tab.usesAppLogo {
-                    RoundedRectangle(cornerRadius: 1)
-                        .fill(OWColor.accentDeep)
-                        .frame(height: 2)
-                        .padding(.horizontal, 8)
-                }
-            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -18,6 +18,7 @@ struct KitTestRunner {
         failures += ttsSpeedFailures()
         failures += ttsVolumeFailures()
         failures += ttsVoiceRegistryFailures()
+        failures += ttsVoiceRouterFailures()
         failures += transcriptHistoryBufferFailures()
         failures += spectrumBandsFailures()
         failures += dotMatrixFailures()
