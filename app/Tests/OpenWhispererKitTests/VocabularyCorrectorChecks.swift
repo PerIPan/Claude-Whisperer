@@ -43,6 +43,16 @@ func vocabularyCorrectorFailures() -> [String] {
     check("run codex, then kokoro!", ["Codex", "Kokoro"], "run Codex, then Kokoro!", "punctuation")
     // Empty glossary is a no-op.
     check("anything", [], "anything", "emptyNoOp")
+    // Pure extension guard: a real word that is a strict prefix of a glossary term
+    // must survive. "code" is 1 edit from "Codex" (threshold 1) and was being rewritten.
+    check("write the code now", ["Codex"], "write the code now", "prefixNotCaptured")
+    check("the codec is fine", ["Codex"], "the codec is fine", "substitutionStillGuarded")
+    // ...while a genuine mis-hear (substitution, not truncation) is still corrected.
+    check("run cocorro now", ["Kokoro"], "run Kokoro now", "fuzzyStillWorks")
+    // `#` comment lines are not glossary terms.
+    if VocabularyCorrector.parseGlossary("#Codex\nKokoro") != ["Kokoro"] {
+        failures.append("VocabularyCorrector.hashComment: got \(VocabularyCorrector.parseGlossary("#Codex\nKokoro"))")
+    }
 
     return failures
 }

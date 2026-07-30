@@ -26,18 +26,18 @@ enum Paths {
     static let serverLog = appSupport.appendingPathComponent("server.log")
     static let setupLog = appSupport.appendingPathComponent("setup.log")
 
-    /// Card expanded states (persisted so the branded popover's collapse/expand survives
-    /// restarts). Restored 2026-07-19 with the branded popover UI.
     // The collapsible-card expand prefs (setup_expanded / voice_settings_expanded /
     // server_expanded) died with the pop-over — the tabbed Settings window has no
     // collapsible cards. Removed 2026-07-20.
 
-    /// Legacy model space from the removed WhisperKit engine (2026-07-13). Nothing
-    /// downloads here anymore; ModelStorage lists it so "Delete models" reclaims an
-    /// orphaned Whisper cache. (FluidAudio's models live in Application Support/
-    /// FluidAudio and ~/.cache/fluidaudio — upstream pins the shared G2P/lexicon
-    /// assets to the latter, so they can't be cleanly relocated.)
+    /// Where the app downloads the Whisper (WhisperKit) model. (Kokoro's models live
+    /// in ~/.cache/fluidaudio — upstream pins the shared G2P/lexicon assets there, so
+    /// they can't be cleanly relocated.)
     static let modelsDir = appSupport.appendingPathComponent("models")
+    /// WhisperKit's HuggingFace hub root. Kept under Application Support rather than
+    /// the user's (often iCloud-synced) ~/Documents, mirroring the legacy
+    /// ~/Documents/huggingface layout so a one-time move suffices.
+    static let whisperHubBase = modelsDir.appendingPathComponent("huggingface")
 
     /// Auto-submit flag file (read in-process by the Swift app)
     static let autoSubmitFlag = appSupport.appendingPathComponent("auto_submit")
@@ -48,7 +48,7 @@ enum Paths {
     /// Auto-focus "with return" flag — return to origin app after text insertion
     static let autoFocusReturn = appSupport.appendingPathComponent("auto_focus_return")
 
-    /// STT language file (script-filter hint for in-process Parakeet STT;
+    /// STT language file (language hint for in-process WhisperKit STT;
     /// absent/"auto" = model auto-detect)
     static let sttLanguage = appSupport.appendingPathComponent("stt_language")
 

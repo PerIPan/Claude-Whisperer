@@ -21,9 +21,9 @@ struct AdvancedTab: View {
 
                     VStack(spacing: 0) {
                         ModernStatusRow(
-                            label: "Parakeet STT",
+                            label: "Whisper STT",
                             subtitle: dictationManager.sttModelReady
-                                ? "parakeet-tdt-0.6b-v3"
+                                ? SpeechTranscriber.modelName
                                 : (dictationManager.sttStatus ?? "Loading…"),
                             port: "local",
                             status: dictationManager.sttModelReady ? .running : .starting

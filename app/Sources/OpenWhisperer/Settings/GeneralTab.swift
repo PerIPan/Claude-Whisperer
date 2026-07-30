@@ -135,7 +135,7 @@ struct GeneralTab: View {
 
                 engineRow(icon: "waveform",
                           title: "Speech to text",
-                          detail: "Parakeet TDT v3 — on the Apple Neural Engine, 25 languages")
+                          detail: "WhisperKit large-v3 turbo — on the Apple Neural Engine, 99 languages")
                 engineRow(icon: "speaker.wave.2",
                           title: "Text to speech",
                           detail: "Kokoro-82M — ~54 voices across 9 languages")

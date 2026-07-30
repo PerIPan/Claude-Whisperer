@@ -11,9 +11,9 @@ private let dictLog = OSLog(subsystem: "com.openwhisperer.app", category: "dicta
 class DictationManager: ObservableObject {
     let recorder = AudioRecorder()
     let keywordDetector = KeywordDetector()
-    /// In-process Parakeet TDT v3 STT (FluidAudio, CoreML/ANE). Replaced WhisperKit
+    /// In-process WhisperKit STT (CoreML/ANE). Restored 2026-07-30, replacing Parakeet
     /// 2026-07-13 — see the engine-configurability spec's migration addendum.
-    let parakeet = ParakeetTranscriber()
+    let whisper = SpeechTranscriber()
     /// In-process TTS playback (Phase 3). Injected by `AppDelegate` from `ServerManager`; used by
     /// `killTTS()` for instant barge-in. Optional so headless/test paths without a server still run.
     var ttsController: TTSPlaybackController?
@@ -159,15 +159,15 @@ class DictationManager: ObservableObject {
         speakArmedTimer?.invalidate()
     }
 
-    /// Kick off the one-time Parakeet model download + load. Call at launch so the
+    /// Kick off the one-time Whisper model download + load. Call at launch so the
     /// first dictation isn't blocked on a multi-minute download. Idempotent.
     func prepareSTT() {
         guard !sttModelReady else { return }
-        // Set expectations: the first launch downloads (~460 MB) and then compiles
+        // Set expectations: the first launch downloads (~1.5 GB) and then compiles
         // the model for the Neural Engine. Without this, a slow first load looks "stuck".
-        sttStatus = ParakeetTranscriber.isModelCached
+        sttStatus = SpeechTranscriber.isModelCached
             ? "Preparing the speech model… first launch compiles it for the Neural Engine. Dictation will be ready when it finishes."
-            : "Downloading the speech model… one-time, about 460 MB. This can take a few minutes on first launch."
+            : "Downloading the speech model… one-time, about 1.5 GB. This can take a few minutes on first launch."
         Task { [weak self] in
             guard let self else { return }
             // Live percent while the archive downloads (first run only — the handler
@@ -181,13 +181,13 @@ class DictationManager: ObservableObject {
                         self.sttStatus = "Download done — compiling for the Neural Engine…"
                     } else if pct != self.lastReportedDownloadPct {
                         self.lastReportedDownloadPct = pct
-                        self.sttStatus = "Downloading the speech model… \(pct)% of ~460 MB (one-time)."
+                        self.sttStatus = "Downloading the speech model… \(pct)% of ~1.5 GB (one-time)."
                     }
                 }
             }
             do {
-                await self.parakeet.setDownloadProgressHandler(progressHandler)
-                _ = try await self.parakeet.prepare()
+                await self.whisper.setDownloadProgressHandler(progressHandler)
+                _ = try await self.whisper.prepare()
                 await MainActor.run {
                     self.sttModelReady = true
                     self.sttWarm = true
@@ -214,13 +214,19 @@ class DictationManager: ObservableObject {
     }
 
     /// A short, actionable message for a model-load failure.
-    /// Transcribe via Parakeet, which self-prepares on first use, and mark the
+    /// Transcribe via Whisper, which self-prepares on first use, and mark the
     /// model warm on success so the watchdog can tighten.
     private func transcribeSTT(samples: [Float], language: String?) async throws -> String {
-        let text = try await parakeet.transcribe(samples: samples, language: language)
+        let text = try await whisper.transcribe(samples: samples, language: language)
         // Fillers first: removing "um" restores word adjacency for the
         // corrector's split-absorption window ("code, um, x" -> "Codex").
-        let defillered = DisfluencyFilter.apply(text)
+        //
+        // English only. The filler list contains "um", which is the Portuguese
+        // masculine article and a German preposition ("Ich gehe um 5 Uhr"), so an
+        // unconditional pass deletes real words. `language == nil` is auto-detect —
+        // we can't know what was spoken, and Whisper already drops most fillers on
+        // its own, so skipping there is the safe default.
+        let defillered = (language == "en") ? DisfluencyFilter.apply(text) : text
         let glossary = VocabularyCorrector.parseGlossary(
             try? String(contentsOf: Paths.sttVocabulary, encoding: .utf8))
         let corrected = VocabularyCorrector.apply(defillered, glossary: glossary)
@@ -239,18 +245,24 @@ class DictationManager: ObservableObject {
     /// watchdogged transcribe task.
     private func prewarmSTTIfNeeded() {
         guard !sttWarm else { return }
-        sttStatus = "Loading the speech model… the first dictation can take a moment."
+        sttStatus = "Loading the speech model… the first dictation can take a minute or two."
         Task { [weak self] in
             guard let self else { return }
             do {
-                _ = try await self.parakeet.prepare()
+                _ = try await self.whisper.prepare()
                 await MainActor.run {
                     self.sttWarm = true
+                    // Mirror prepareSTT's success state. Without this, a launch-time
+                    // load failure that later succeeds here left the menubar on the
+                    // hourglass and Advanced on "Loading…" while dictation worked.
+                    self.sttModelReady = true
+                    self.sttFailed = false
                     self.sttStatus = nil
                 }
             } catch {
                 await MainActor.run {
-                    self.sttStatus = "Speech model failed to load: \(error.localizedDescription)"
+                    self.sttFailed = true
+                    self.sttStatus = Self.sttFailureMessage(for: error)
                 }
             }
         }

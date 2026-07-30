@@ -20,7 +20,11 @@ public enum VocabularyCorrector {
         var terms: [String] = []
         for piece in raw.split(whereSeparator: { $0 == "," || $0.isNewline }) {
             let term = piece.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !term.isEmpty, seenKeys.insert(term.lowercased()).inserted else { continue }
+            // Skip `#` comments — VocabularyPrompt (the acoustic layer) already does,
+            // and reading the same file two ways turned "#Codex" into a literal term
+            // that then rewrote "code" as "#Codex" in transcripts.
+            guard !term.isEmpty, !term.hasPrefix("#"),
+                  seenKeys.insert(term.lowercased()).inserted else { continue }
             terms.append(term)
             if terms.count == maxTerms { break }
         }
@@ -118,11 +122,18 @@ public enum VocabularyCorrector {
             // Size N+1 before N so a split term ("code x") is absorbed whole
             // before the N window could fuzzy-grab its first half alone.
             for size in [n + 1, n] {
+                // A short target one edit from a single word captures real words:
+                // with "Codex" (5) that rewrote "code" and "codec". Only the
+                // split-absorption window (size > n, e.g. "code x") stays fuzzy at
+                // that length — a stray space is dictation noise, a different word
+                // is not. Longer targets keep fuzzy for both window sizes.
+                if size == n && target.count < 6 { continue }
                 var start = 0
                 while start + size <= wordPositions.count {
                     guard let cand = candidate(at: start, size: size),
                           cand != target,
                           !allTermsLowered.contains(cand),  // never fuzzy-capture another term
+                          !isPureExtension(of: cand, target: collapsedTarget),
                           levenshtein(collapseRepeats(cand), collapsedTarget, limit: threshold)
                               <= threshold
                     else {
@@ -136,6 +147,18 @@ public enum VocabularyCorrector {
         }
 
         return tokens.map(\.text).joined()
+    }
+
+    /// True when the candidate is a strict prefix of the target — i.e. the "match" is
+    /// pure insertion at the end. That class is almost always a real word the user
+    /// meant: with the glossary term "Codex", `levenshtein("code", "codex") == 1` is
+    /// inside the 5-char threshold, so "write the code now" became "write the Codex
+    /// now". Genuine mis-hears substitute or transpose letters ("cocorro" → Kokoro)
+    /// rather than simply stopping short, so excluding prefixes costs nothing real.
+    private static func isPureExtension(of candidate: String, target collapsedTarget: String) -> Bool {
+        let collapsedCandidate = collapseRepeats(candidate)
+        return collapsedCandidate.count < collapsedTarget.count
+            && collapsedTarget.hasPrefix(collapsedCandidate)
     }
 
     // MARK: - Internals

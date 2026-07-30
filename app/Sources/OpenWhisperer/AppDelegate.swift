@@ -27,6 +27,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ConfigManager.migrateRemoveClaudeStopHook()
         // Delete the orphaned overlay_lines pref (grip removed with menubar history).
         ConfigManager.removeLegacyOverlayLines()
+        // Move a legacy ~/Documents Whisper hub into Application Support before the
+        // model is loaded, so an existing 1.5 GB cache isn't re-downloaded.
+        ModelStorage.migrateWhisperHubIfNeeded()
         // Prompt for Accessibility permission if not already granted
         accessibilityManager.requestIfNeeded()
         // Clean stale temp/lock/pid files from previous sessions (background, delayed)
@@ -51,7 +54,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Start hotkey listener immediately so Ctrl works without opening the menubar first
         setupDictation()
 
-        // Kick off the one-time Parakeet model download + load so the first dictation
+        // Kick off the one-time Whisper model download + load so the first dictation
         // isn't blocked on it. Independent of the in-process TTS server (`TTSHTTPServer` on :8000).
         dictationManager.prepareSTT()
 

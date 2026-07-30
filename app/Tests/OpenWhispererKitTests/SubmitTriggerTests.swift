@@ -25,6 +25,7 @@ struct KitTestRunner {
         failures += peakHoldFailures()
         failures += overlaySizeFailures()
         failures += vocabularyCorrectorFailures()
+        failures += vocabularyPromptFailures()
         failures += disfluencyFilterFailures()
 
         if failures.isEmpty {

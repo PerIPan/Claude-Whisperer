@@ -7,7 +7,7 @@ import OpenWhispererKit
 private let audioLog = OSLog(subsystem: "com.openwhisperer.app", category: "audio")
 
 /// Records microphone audio, provides real-time RMS levels for waveform,
-/// and exports 16 kHz mono Float32 PCM for in-process Parakeet (FluidAudio) transcription.
+/// and exports 16 kHz mono Float32 PCM for in-process WhisperKit transcription.
 class AudioRecorder: ObservableObject {
     enum State {
         case idle, recording, uploading

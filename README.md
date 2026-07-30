@@ -29,6 +29,7 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ### 1.11.0
 
+- **Back to WhisperKit for dictation** — the speech-to-text engine returns to **WhisperKit** (large-v3 turbo), reversing 1.10.0's switch to Parakeet. You get Whisper's stronger noise robustness, ~99 languages, and cleaner punctuation/casing; the trade is a slower first load and slower decode. Your custom vocabulary now works at **both** layers — it biases the model as it listens *and* corrects the finished transcript.
 - **A real Settings window** — settings move out of the menubar popover into a proper five-tab window: **Dictation · Voice · Agents · Advanced**, with **General** on the right as the app logo. It keeps the warm cream/gold identity throughout — the tab bar is drawn by the app, so there's no gray system strip. The menubar is now a small dropdown (Settings · Show Overlay · Quit).
 - **Connect several agents at once** — the Agents tab lists **all four** agents (Claude Code, Codex CLI, Pi, Antigravity) with their own status and **Connect** button, instead of a single-select picker that implied you could only use one. Each row has an ⓘ explaining exactly which files get written, and the manual follow-up step (Pi's `/reload`, Codex's one-time hook trust, agy's new session) stays on screen instead of hiding in a tooltip.
 - **Permissions you can actually act on** — a missing grant is now the loudest thing on the tab (it used to render in the faintest color in the palette), rows are real buttons that open System Settings, and the logo tab carries a badge whenever something needs attention.
@@ -50,7 +51,7 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 - **Native Settings window** — the old menubar popover is replaced by a proper tabbed macOS Settings window: **General** (login item, permissions), **Input** (dictation, language, app focus), **Voice** (voice, speed, volume, response), **Agents** (platform picker + one-click apply), and **Advanced** (models, server, diagnostics). The menubar is now a clean dropdown.
 - **Reworked overlay** — the floating overlay is resizable, pauses when idle, and offers selectable analyzer styles (LED bars, graph, curtain, spectrum) picked in Settings. Real mic levels drive the spectrum and real playback levels drive the speaking wave, on a frosted faceplate with a breathing status lamp.
 - **Transcription history** — recent dictations now appear right in the menubar dropdown, backed by a session store.
-- **Custom vocabulary** — add a glossary of your own terms in Settings; a fuzzy corrector post-fixes transcripts against it (handy for names, jargon, and product names Parakeet mishears).
+- **Custom vocabulary** — add a glossary of your own terms in Settings; a fuzzy corrector post-fixes transcripts against it (handy for names, jargon, and product names the model mishears).
 
 <details>
 <summary><strong>Earlier releases — 1.6.x, 1.5.x</strong> (Antigravity & Pi, voice personas, native rewrite, streaming TTS)</summary>
@@ -100,7 +101,7 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 [**Download OpenWhisperer-1.11.0.dmg**](https://github.com/PerIPan/OpenWhisperer/releases/download/v1.11.0/OpenWhisperer-1.11.0.dmg) — drag to Applications and launch.
 
 On first launch, the app:
-- Downloads the Parakeet (speech-to-text) and Kokoro (text-to-speech) CoreML models
+- Downloads the Whisper (speech-to-text) and Kokoro (text-to-speech) CoreML models
 - Loads both models on the Apple Neural Engine
 - Starts the in-app TTS server automatically (loopback only, port 8000)
 
@@ -129,7 +130,7 @@ Everything else lives in the **Settings** window (⌘,), across five tabs:
 
 **Agents** — all four agents (Claude Code, Codex CLI, Pi, Antigravity) with their own status and **Connect** button; connect as many as you use. Each has an ⓘ explaining exactly which files get written.
 
-**Advanced** — model status (Parakeet STT / Kokoro TTS), the TTS server and port, delete downloaded models, server/events logs, and Copy Diagnostics.
+**Advanced** — model status (Whisper STT / Kokoro TTS), the TTS server and port, delete downloaded models, server/events logs, and Copy Diagnostics.
 
 **General** (the logo tab, on the right) — first-run and model-loading progress, launch at login, and the permission list (Accessibility, Microphone, and Speech Recognition in Hands-Free). Each row opens the matching System Settings pane; the logo tab is badged whenever a grant is missing.
 
@@ -137,7 +138,7 @@ Hover the **ⓘ** on any section for in-app help.
 
 ## Voice Input Modes
 
-Three modes for speech-to-text, all using your local Parakeet model. Transcribed text is typed directly into whatever app you have focused.
+Three modes for speech-to-text, all using your local Whisper model. Transcribed text is typed directly into whatever app you have focused.
 
 ### Hold-to-Talk (default)
 
@@ -149,7 +150,7 @@ Three modes for speech-to-text, all using your local Parakeet model. Transcribed
 
 1. Press **Ctrl** — recording starts (red indicator)
 2. Speak your message
-3. Press **Ctrl** again — audio is sent to Parakeet for transcription
+3. Press **Ctrl** again — audio is sent to Whisper for transcription
 4. Text is inserted via Accessibility (native apps) or CGEvent Unicode typing (all others) — clipboard is never touched
 
 ### Hands-Free
@@ -261,7 +262,7 @@ Most settings are configured in the Settings window (voice, volume, language, ho
   brew install jq
   ```
 
-There is **no Python, virtualenv, or `pip`/`uv` step** — speech-to-text and text-to-speech are native Swift (FluidAudio: Parakeet STT + Kokoro TTS) and run in-process on the Apple Neural Engine.
+There is **no Python, virtualenv, or `pip`/`uv` step** — speech-to-text and text-to-speech are native Swift (WhisperKit for STT, FluidAudio Kokoro for TTS) and run in-process on the Apple Neural Engine.
 
 ### Step 1: Build the app
 
@@ -272,7 +273,7 @@ chmod +x build-dmg.sh
 ./build-dmg.sh
 ```
 
-This produces `OpenWhisperer.app` and `OpenWhisperer-1.11.0.dmg` in `app/.build/`. Launch the app — on first launch it downloads the Parakeet and Kokoro models, then starts the in-app TTS server on `localhost:8000` automatically. (For a plain debug build during development, run `swift build` from `app/`.)
+This produces `OpenWhisperer.app` and `OpenWhisperer-1.11.0.dmg` in `app/.build/`. Launch the app — on first launch it downloads the Whisper and Kokoro models, then starts the in-app TTS server on `localhost:8000` automatically. (For a plain debug build during development, run `swift build` from `app/`.)
 
 ### Step 2: Wire up the hooks
 
@@ -315,7 +316,7 @@ OpenWhisperer/
 └── app/                      # macOS menubar app (Swift Package)
     ├── Package.swift
     ├── Sources/
-    │   ├── OpenWhisperer/     # App + native STT (Parakeet) + native TTS (Kokoro), both via FluidAudio
+    │   ├── OpenWhisperer/     # App + native STT (WhisperKit) + native TTS (FluidAudio Kokoro)
     │   └── OpenWhispererKit/  # Pure, unit-tested logic
     ├── Tests/
     ├── Resources/
@@ -328,12 +329,12 @@ Contributions are welcome! Feel free to open issues or submit pull requests. Whe
 
 ## Acknowledgments
 
-The native rewrite at the heart of this app — replacing the out-of-process Python server with fully in-process Swift speech-to-text and text-to-speech (FluidAudio Kokoro), in-process streaming playback and barge-in, and the tagless voice-turn handshake — was contributed by [**Hakan Ensari**](https://github.com/hakanensari) ([fork](https://github.com/hakanensari/OpenWhisperer)). It removed the Python/venv stack entirely and made the app notarizable. Thank you! (The rewrite originally used WhisperKit for STT; 1.10.0 replaced it with Parakeet.)
+The native rewrite at the heart of this app — replacing the out-of-process Python server with fully in-process Swift speech-to-text and text-to-speech (FluidAudio Kokoro), in-process streaming playback and barge-in, and the tagless voice-turn handshake — was contributed by [**Hakan Ensari**](https://github.com/hakanensari) ([fork](https://github.com/hakanensari/OpenWhisperer)). It removed the Python/venv stack entirely and made the app notarizable. Thank you! (1.10.0 briefly replaced WhisperKit with Parakeet; 1.11.0 restored WhisperKit.)
 
 ## Credits
 
-- [FluidAudio](https://github.com/FluidInference/FluidAudio) — on-device Parakeet speech-to-text and Kokoro text-to-speech (CoreML / Apple Neural Engine)
-- [Parakeet TDT](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) — NVIDIA's speech-to-text model
+- [WhisperKit](https://github.com/argmaxinc/WhisperKit) — on-device speech-to-text (CoreML / Apple Neural Engine)
+- [FluidAudio](https://github.com/FluidInference/FluidAudio) — on-device Kokoro text-to-speech (CoreML / Apple Neural Engine)
 - [Kokoro](https://huggingface.co/prince-canuma/Kokoro-82M) — TTS model
 - [jq](https://jqlang.github.io/jq/) — JSON processor (used by the hooks)
 - [Claude Code](https://claude.ai/claude-code) — Anthropic's CLI
