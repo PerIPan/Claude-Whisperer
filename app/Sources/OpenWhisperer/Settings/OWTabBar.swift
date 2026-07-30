@@ -19,24 +19,15 @@ struct OWTabBar: View {
     private var namedTabs: [SettingsTab] { SettingsTab.allCases.filter { !$0.usesAppLogo } }
     private var logoTab: SettingsTab? { SettingsTab.allCases.first { $0.usesAppLogo } }
 
-    private var versionString: String {
-        "v" + ((Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "?")
-    }
-
     var body: some View {
         HStack(spacing: 2) {
             ForEach(namedTabs) { tab in
                 OWTabButton(tab: tab, isSelected: selection == tab) { selection = tab }
             }
 
-            // Version sits in the gap between the named tabs and the logo. Hidden from
-            // VoiceOver's tab enumeration — it's chrome, not a tab.
-            Text(versionString)
-                .font(OWFont.caption(10))
-                .foregroundColor(OWColor.inkSoft)
-                .monospacedDigit()
-                .padding(.horizontal, 12)
-                .accessibilityHidden(true)
+            // Version lives in General's About card, not here — in the strip it read
+            // as a fifth, disabled tab.
+            Spacer(minLength: 12)
 
             if let logoTab {
                 OWTabButton(tab: logoTab,

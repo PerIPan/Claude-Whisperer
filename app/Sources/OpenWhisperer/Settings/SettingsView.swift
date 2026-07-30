@@ -8,12 +8,12 @@ struct SettingsView: View {
     @EnvironmentObject var dictationManager: DictationManager
     @EnvironmentObject var accessibilityManager: AccessibilityManager
 
-    /// Fixed content width (the window is not user-resizable).
+    /// Fixed content size (the window is not user-resizable). The height is explicit
+    /// rather than derived from each tab: sizing to content clipped the tallest tab
+    /// (Dictation) and made the window jump on every switch. With a fixed height the
+    /// ScrollView below has an unambiguous ideal size, so nothing is ever cut off.
     static let contentWidth: CGFloat = 520
-    /// Floor so short tabs (Agents, General) don't collapse the window — cream space
-    /// below a top-aligned stack reads as composure; a window that snaps between
-    /// 205 and 505 pt reads as a bug.
-    static let minContentHeight: CGFloat = 400
+    static let contentHeight: CGFloat = 620
 
     /// Owned by `SettingsWindow` so re-opening can switch tabs on a live window.
     @EnvironmentObject var selection: SettingsSelection
@@ -22,21 +22,20 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             OWTabBar(selection: $selection.tab, needsAttention: needsAttention)
 
-            // No ScrollView: it reports an ambiguous ideal height, and NSHostingController
-            // sizes the window from that — which yields a degenerate window. Each tab's
-            // content is modest, so the window simply sizes to the active tab.
-            Group {
-                switch selection.tab {
-                case .general:   GeneralTab()
-                case .dictation: DictationTab()
-                case .voice:     VoiceTab()
-                case .agents:    AgentsTab()
-                case .advanced:  AdvancedTab()
+            ScrollView {
+                Group {
+                    switch selection.tab {
+                    case .general:   GeneralTab()
+                    case .dictation: DictationTab()
+                    case .voice:     VoiceTab()
+                    case .agents:    AgentsTab()
+                    case .advanced:  AdvancedTab()
+                    }
                 }
+                .padding(18)
+                .frame(width: Self.contentWidth, alignment: .topLeading)
             }
-            .padding(18)
-            .frame(width: Self.contentWidth, alignment: .topLeading)
-            .frame(minHeight: Self.minContentHeight, alignment: .top)
+            .frame(width: Self.contentWidth, height: Self.contentHeight)
         }
         .frame(width: Self.contentWidth)
         .background(OWColor.page)

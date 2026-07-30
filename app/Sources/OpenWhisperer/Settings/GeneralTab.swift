@@ -17,6 +17,7 @@ struct GeneralTab: View {
         VStack(alignment: .leading, spacing: 12) {
             setupProgressSection
             modelLoadingBanner
+            aboutCard
 
             OWCard {
                 VStack(alignment: .leading, spacing: 10) {
@@ -98,6 +99,73 @@ struct GeneralTab: View {
         return accessibilityManager.isGranted
             && dictationManager.recorder.micPermission
             && (!speechNeeded || dictationManager.keywordDetector.permissionGranted)
+    }
+
+    // MARK: - About
+
+    /// Identity block: wordmark, version, and what the app actually is — the engines
+    /// and the headline features. The version used to sit in the tab bar, where it
+    /// read as a fifth, disabled tab.
+    private var aboutCard: some View {
+        OWCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
+                    if let icon = NSApp.applicationIconImage {
+                        Image(nsImage: icon)
+                            .resizable()
+                            .frame(width: 40, height: 40)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Open Whisperer")
+                            .font(OWFont.title(17))
+                            .foregroundColor(OWColor.ink)
+                        Text("Voice mode for your coding agent — dictation in, spoken replies out. Everything runs on this Mac; nothing is sent to the cloud.")
+                            .font(OWFont.caption(11))
+                            .foregroundColor(OWColor.inkSoft)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 6)
+                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
+                        .font(OWFont.body(11))
+                        .foregroundColor(OWColor.inkSoft)
+                        .monospacedDigit()
+                }
+
+                OWInternalDivider()
+
+                engineRow(icon: "waveform",
+                          title: "Speech to text",
+                          detail: "Parakeet TDT v3 — on the Apple Neural Engine, 25 languages")
+                engineRow(icon: "speaker.wave.2",
+                          title: "Text to speech",
+                          detail: "Kokoro-82M — ~54 voices across 9 languages")
+
+                OWInternalDivider()
+
+                Text("Three ways to dictate (hold, press, or hands-free), spoken replies for Claude Code, Codex, Pi and Antigravity, a live transcription overlay, and a custom vocabulary that corrects your own jargon.")
+                    .font(OWFont.caption(11))
+                    .foregroundColor(OWColor.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func engineRow(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(OWColor.accentDeep)
+                .frame(width: 14)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(OWFont.body(11))
+                    .foregroundColor(OWColor.ink)
+                Text(detail)
+                    .font(OWFont.caption(11))
+                    .foregroundColor(OWColor.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     // MARK: - First-run signals
