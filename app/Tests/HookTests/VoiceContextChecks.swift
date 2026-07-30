@@ -351,6 +351,15 @@ func voiceContextFailures() -> [String] {
         if n?.contains("voice speaking your reply") == true { fail("languageFollowsOverride: unexpected persona from global") }
     }
 
+    // 34a) Vietnamese — the router dropped `vi` once while claiming to carry every Supertonic
+    //      language, silently degrading it to an English voice. Pin the hook's map too.
+    do {
+        let s = newSandbox()
+        s.writeVoiceTurn(forPrompt: "go"); s.writeTtsVoice("supertonic:vi:F1")
+        let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"), sandbox: s).stdout)
+        if n?.contains("in Vietnamese, not English") != true { fail("vietnameseLanguageLine: \(n?.debugDescription ?? "nil")") }
+    }
+
     // 34) an unknown language code yields no line rather than a broken sentence.
     do {
         let s = newSandbox()

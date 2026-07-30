@@ -57,8 +57,9 @@ final class TTSEngines: Sendable {
 
     /// The rate `AudioPlaybackEngine`'s node is wired at. It builds one fixed-format graph in
     /// `init` and `schedule` takes no per-item rate, so everything reaching it must be at this
-    /// rate — a 44.1 kHz buffer would otherwise play ~1.8× too slow.
-    private static let playbackSampleRate = 24_000
+    /// rate — a 44.1 kHz buffer would otherwise play ~1.8× too slow. Read from the engine
+    /// itself so the two can't drift apart.
+    private static let playbackSampleRate = Int(AudioPlaybackEngine.defaultSampleRate)
 
     /// Synthesize → fp32 PCM samples at `playbackSampleRate` (streaming playback).
     ///

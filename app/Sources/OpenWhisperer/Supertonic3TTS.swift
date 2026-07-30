@@ -39,6 +39,10 @@ actor Supertonic3TTS {
     /// Decoded style tensors, keyed by style name. `Supertonic3VoiceStyle` is `Sendable` and
     /// reusable across synthesize calls, so we fetch each style at most once per launch.
     private var styles: [String: Supertonic3VoiceStyle] = [:]
+    /// In-flight fetches, keyed the same way, so concurrent first uses of one style share a
+    /// single download instead of racing. `TTSHTTPServer` starts an unstructured `Task` per
+    /// connection, so two `/v1/audio/speech` requests really can arrive together.
+    private var styleTasks: [String: Task<Supertonic3VoiceStyle, Error>] = [:]
 
     var isReady: Bool { loaded }
 
@@ -95,9 +99,23 @@ actor Supertonic3TTS {
             ? style.uppercased()
             : TTSVoiceRouter.defaultSupertonicStyle
         if let cached = styles[name] { return cached }
+        // Check-then-await-then-write would let two concurrent callers both miss the cache and
+        // fetch the same style, so share the in-flight task the way `prepare()` does. The
+        // check and the insert below happen with no `await` between them.
+        if let inFlight = styleTasks[name] { return try await inFlight.value }
+
         let voice = Supertonic3Voice(name: name) ?? .default
-        let loadedStyle = try await Supertonic3ResourceDownloader.loadVoiceStyle(voice)
-        styles[name] = loadedStyle
-        return loadedStyle
+        let task = Task { try await Supertonic3ResourceDownloader.loadVoiceStyle(voice) }
+        styleTasks[name] = task
+        do {
+            let loadedStyle = try await task.value
+            styles[name] = loadedStyle
+            styleTasks[name] = nil
+            return loadedStyle
+        } catch {
+            // Drop the failed task so a later attempt can retry rather than replaying the error.
+            styleTasks[name] = nil
+            throw error
+        }
     }
 }

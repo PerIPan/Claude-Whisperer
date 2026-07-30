@@ -43,7 +43,7 @@ public enum TTSVoiceRouter {
     public static let supertonicLanguages: Set<String> = [
         "en", "ko", "ja", "ar", "bg", "cs", "da", "de", "el", "es", "et", "fi",
         "fr", "hi", "hr", "hu", "id", "it", "lt", "lv", "nl", "pl", "pt", "ro",
-        "ru", "sk", "sl", "sv", "tr", "uk",
+        "ru", "sk", "sl", "sv", "tr", "uk", "vi",
     ]
 
     /// The ten built-in voice styles (`Supertonic3Voice`): five female, five male.

@@ -23,7 +23,12 @@ final class AudioPlaybackEngine {
     /// controller can clear the "Speaking…" lock instead of hanging.
     var onPlaybackError: (@Sendable () -> Void)?
 
-    init(sampleRate: Double = 24_000) {
+    /// The rate this engine's graph is wired at. Everything scheduled must already be at this
+    /// rate — `schedule` takes no per-item rate — so `TTSEngines` resamples against this same
+    /// constant rather than a second literal that could drift out of step with it.
+    static let defaultSampleRate: Double = 24_000
+
+    init(sampleRate: Double = AudioPlaybackEngine.defaultSampleRate) {
         guard let fmt = AVAudioFormat(
             commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false) else {
             fatalError("AudioPlaybackEngine: unsupported PCM format at \(sampleRate) Hz")

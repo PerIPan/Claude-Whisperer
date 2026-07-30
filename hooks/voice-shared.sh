@@ -124,7 +124,7 @@ resolve_language_line() {
     fi) language="Finnish" ;;    hr) language="Croatian" ;;    hu) language="Hungarian" ;;
     id) language="Indonesian" ;; lt) language="Lithuanian" ;;  lv) language="Latvian" ;;
     ro) language="Romanian" ;;   sk) language="Slovak" ;;      sl) language="Slovenian" ;;
-    sv) language="Swedish" ;;    tr) language="Turkish" ;;
+    sv) language="Swedish" ;;    tr) language="Turkish" ;;     vi) language="Vietnamese" ;;
     *) echo ""; return ;;
   esac
   # Sentinel phrase kept distinct from resolve_flavor's "voice speaking your reply" so the two

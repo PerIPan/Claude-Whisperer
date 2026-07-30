@@ -114,7 +114,7 @@ The curation reasoning **inverts** from Piper: with Piper each language is a sep
 download, so a short list saved bytes. With Supertonic all 31 languages ride in the **one** model,
 so adding a language costs **zero** extra download — the list is purely a UI-clutter decision.
 Hence: the picker shows the five that were listened to and ASR-verified, while
-`TTSVoiceRouter.supertonicLanguages` accepts all 30 (31 minus `na`) so `OW_TTS_VOICE` can name any
+`TTSVoiceRouter.supertonicLanguages` accepts all 31 (32 minus the `na` language-agnostic entry) so `OW_TTS_VOICE` can name any
 of them. Extending the picker later is a registry-only edit.
 
 Two styles rather than ten because F1–F5/M1–M5 are generic **speaker styles, not accents** —
@@ -147,7 +147,7 @@ documents the new id shape, since the model reads it to choose voices.
 
 - **`OpenWhispererKitTests`** — router resolution (bare vs tagged, case/whitespace normalization,
   style clamping, unsupported-language fallback, `zh` explicitly excluded), `supertonicID`
-  round-trip across all 30 × 10 combinations, registry integrity (per-engine counts, unique ids,
+  round-trip across all 31 × 10 combinations, registry integrity (per-engine counts, unique ids,
   every multilingual id routing to a real language + style).
 - **`HookTests`** — seven checks: Dutch line present with the right voice arg, another language
   not hard-coded to Dutch, multilingual voice gets no persona, Kokoro gets no language line,

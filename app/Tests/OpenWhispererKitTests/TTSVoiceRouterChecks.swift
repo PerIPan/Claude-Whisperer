@@ -67,10 +67,19 @@ func ttsVoiceRouterFailures() -> [String] {
     if TTSVoiceRouter.supertonicLanguages.contains("zh") {
         failures.append("TTSVoiceRouter.supertonicLanguages must not contain 'zh' (not trained)")
     }
-    if TTSVoiceRouter.supertonicLanguages.count != 30 {
+    // 31 = Supertonic3Constants.availableLanguages (32) minus the "na" language-agnostic entry.
+    // Assert the specific tail codes too: a bare count let `vi` go missing once already, which
+    // silently degraded Vietnamese to an English voice — the exact bug this feature fixes.
+    if TTSVoiceRouter.supertonicLanguages.count != 31 {
         failures.append(
-            "TTSVoiceRouter.supertonicLanguages: expected 30 codes, got "
+            "TTSVoiceRouter.supertonicLanguages: expected 31 codes, got "
                 + "\(TTSVoiceRouter.supertonicLanguages.count)")
+    }
+    for code in ["vi", "uk", "tr", "sv", "en", "nl"] where !TTSVoiceRouter.supertonicLanguages.contains(code) {
+        failures.append("TTSVoiceRouter.supertonicLanguages: missing '\(code)'")
+    }
+    if TTSVoiceRouter.supertonicLanguages.contains("na") {
+        failures.append("TTSVoiceRouter.supertonicLanguages must not contain 'na' (not a language)")
     }
     if TTSVoiceRouter.supertonicStyles.count != 10 {
         failures.append("TTSVoiceRouter.supertonicStyles: expected 10 styles")
