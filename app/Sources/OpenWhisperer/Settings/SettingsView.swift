@@ -10,22 +10,23 @@ struct SettingsView: View {
 
     /// Fixed content width (the window is not user-resizable).
     static let contentWidth: CGFloat = 520
+    /// Floor so short tabs (Agents, General) don't collapse the window — cream space
+    /// below a top-aligned stack reads as composure; a window that snaps between
+    /// 205 and 505 pt reads as a bug.
+    static let minContentHeight: CGFloat = 400
 
-    @State private var selection: SettingsTab
-
-    init(initialTab: SettingsTab = .general) {
-        _selection = State(initialValue: initialTab)
-    }
+    /// Owned by `SettingsWindow` so re-opening can switch tabs on a live window.
+    @EnvironmentObject var selection: SettingsSelection
 
     var body: some View {
         VStack(spacing: 0) {
-            OWTabBar(selection: $selection)
+            OWTabBar(selection: $selection.tab, needsAttention: needsAttention)
 
             // No ScrollView: it reports an ambiguous ideal height, and NSHostingController
             // sizes the window from that — which yields a degenerate window. Each tab's
             // content is modest, so the window simply sizes to the active tab.
             Group {
-                switch selection {
+                switch selection.tab {
                 case .general:   GeneralTab()
                 case .dictation: DictationTab()
                 case .voice:     VoiceTab()
@@ -33,11 +34,17 @@ struct SettingsView: View {
                 case .advanced:  AdvancedTab()
                 }
             }
-            .padding(14)
-            .frame(width: Self.contentWidth, alignment: .leading)
+            .padding(18)
+            .frame(width: Self.contentWidth, alignment: .topLeading)
+            .frame(minHeight: Self.minContentHeight, alignment: .top)
         }
         .frame(width: Self.contentWidth)
         .background(OWColor.page)
         .background(OWWindowBackground())
+    }
+
+    /// A required grant is missing — badges the General (logo) tab from anywhere.
+    private var needsAttention: Bool {
+        !accessibilityManager.isGranted || !dictationManager.recorder.micPermission
     }
 }

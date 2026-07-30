@@ -75,7 +75,8 @@ private struct MenuBarMenu: View {
 
     var body: some View {
         Button("Settings…") {
-            SettingsWindow.show(appDelegate: appDelegate)
+            SettingsWindow.show(tab: SettingsWindow.preferredTab(for: appDelegate),
+                                appDelegate: appDelegate)
         }
         .keyboardShortcut(",", modifiers: .command)
 

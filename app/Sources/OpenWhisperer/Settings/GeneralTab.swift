@@ -41,42 +41,37 @@ struct GeneralTab: View {
                                  icon: "lock.shield",
                                  help: "macOS grants Open Whisperer needs: Accessibility (type into the focused app), Microphone (record dictation), and Speech Recognition (hands-free wake words). Click a row to open Settings.")
 
-                    ModernDiagnosticRow(label: "Accessibility", ok: accessibilityManager.isGranted)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                                NSWorkspace.shared.open(url)
-                            }
+                    OWPermissionRow(label: "Accessibility", granted: accessibilityManager.isGranted) {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                            NSWorkspace.shared.open(url)
                         }
-                        .help("Lets the app type dictated text into the focused app — the clipboard is never touched. Click to open Settings.")
+                    }
+                    .help("Lets the app type dictated text into the focused app — the clipboard is never touched.")
 
-                    ModernDiagnosticRow(label: "Microphone", ok: dictationManager.recorder.micPermission)
-                        .contentShape(Rectangle())
-                        .onTapGesture { dictationManager.recorder.openMicSettings() }
-                        .help("Lets the app record your microphone to capture dictation. Click to open Settings.")
+                    OWPermissionRow(label: "Microphone", granted: dictationManager.recorder.micPermission) {
+                        dictationManager.recorder.openMicSettings()
+                    }
+                    .help("Lets the app record your microphone to capture dictation.")
 
                     // Hands-free only — don't nag for a grant the current mode never uses.
                     if selectedMode == .handsFree {
-                        ModernDiagnosticRow(label: "Speech Recognition",
-                                            ok: dictationManager.keywordDetector.permissionGranted)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition") {
-                                    NSWorkspace.shared.open(url)
-                                }
+                        OWPermissionRow(label: "Speech Recognition",
+                                        granted: dictationManager.keywordDetector.permissionGranted) {
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition") {
+                                NSWorkspace.shared.open(url)
                             }
-                            .help("Hands-Free only: Apple Speech detects the wake words \"initiate\" and \"hold on\". Click to open Settings.")
+                        }
+                        .help("Hands-Free only: Apple Speech detects the wake words \"initiate\" and \"hold on\".")
+                    } else {
+                        Text("Speech Recognition is only needed in Hands-Free mode.")
+                            .font(OWFont.caption())
+                            .foregroundColor(OWColor.inkFaint)
                     }
                 }
             }
 
-            HStack {
-                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
-                    .font(OWFont.caption())
-                    .foregroundStyle(.tertiary)
-                Spacer()
-            }
         }
+        // Version now lives in the tab bar (right of the tabs), so no footer here.
         .onAppear {
             selectedMode = InteractionMode.load()
             // Re-read mic/speech authorization on every appearance so a grant (or

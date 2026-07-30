@@ -120,11 +120,14 @@ struct OWCardHeader: View {
                 .fill(OWColor.accent)
                 .frame(width: 2, height: 13)
             Image(systemName: icon)
+                // accentDeep at full opacity: bright accent at 0.75 on white is ~1.9:1.
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(OWColor.accent.opacity(0.75))
+                .foregroundColor(OWColor.accentDeep)
+            // The brand serif, at the top of the type scale, in full ink — headers were
+            // 11pt inkSoft, i.e. lighter than the content beneath them.
             Text(title)
-                .font(OWFont.sectionLabel(11))
-                .foregroundColor(OWColor.inkSoft)
+                .font(OWFont.serif(13))
+                .foregroundColor(OWColor.ink)
             if let help {
                 OWInfoTip(text: help)
             }
@@ -545,6 +548,52 @@ struct ModernStatusRow: View {
 
 // MARK: - ModernDiagnosticRow
 
+/// A permission row that *looks* clickable — the plain status row gave no hint that
+/// tapping opens System Settings, so nobody discovered it.
+struct OWPermissionRow: View {
+    let label: String
+    let granted: Bool
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: granted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(granted ? OWColor.live : OWColor.warn)
+                Text(label)
+                    .font(OWFont.body(11))
+                    .foregroundColor(granted ? OWColor.inkSoft : OWColor.ink)
+                Spacer(minLength: 6)
+                if !granted {
+                    Text("Grant")
+                        .font(OWFont.body(11))
+                        .foregroundColor(OWColor.accentDeep)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(OWColor.inkFaint)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(!granted ? OWColor.warn.opacity(0.10)
+                                   : (isHovered ? OWColor.pillFill.opacity(0.6) : Color.clear))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.12)) { isHovered = hovering }
+            if hovering { NSCursor.pointingHand.set() } else { NSCursor.arrow.set() }
+        }
+        .accessibilityLabel("\(label): \(granted ? "granted" : "not granted"). Opens System Settings.")
+    }
+}
+
 struct ModernDiagnosticRow: View {
     let label: String
     let ok: Bool
@@ -558,18 +607,20 @@ struct ModernDiagnosticRow: View {
 
             Text(notInstalled ? "\(label) (not installed)" : label)
                 .font(OWFont.body(11))
-                .foregroundColor(notInstalled ? OWColor.inkFaint : (ok ? OWColor.ink : OWColor.inkSoft))
+                // Granted is the calm state; missing is the loud one.
+                .foregroundColor(notInstalled ? OWColor.inkFaint : (ok ? OWColor.inkSoft : OWColor.ink))
         }
     }
 
     private var iconName: String {
         if notInstalled { return "minus.circle" }
-        return ok ? "checkmark.circle.fill" : "xmark.circle"
+        // A missing grant blocks the app — it must not be the quietest thing on screen.
+        return ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
     }
 
     private var iconColor: Color {
         if notInstalled { return OWColor.inkFaint }
-        return ok ? OWColor.live : OWColor.inkFaint
+        return ok ? OWColor.live : OWColor.warn
     }
 }
 
