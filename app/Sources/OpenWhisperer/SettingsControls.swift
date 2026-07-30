@@ -548,6 +548,86 @@ struct ModernStatusRow: View {
 
 // MARK: - ModernDiagnosticRow
 
+// MARK: - OWSlider (branded slider — the system knob is drawn by AppKit and can't be tinted)
+
+struct OWSlider: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var step: Double = 0.05
+    /// Called when a drag finishes, so callers can persist once instead of on every step.
+    var onCommit: (() -> Void)? = nil
+
+    private static let knob: CGFloat = 13
+    private static let track: CGFloat = 4
+
+    var body: some View {
+        GeometryReader { geo in
+            let usable = max(geo.size.width - Self.knob, 1)
+            let fraction = (value - range.lowerBound) / (range.upperBound - range.lowerBound)
+            let x = usable * CGFloat(min(max(fraction, 0), 1))
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(OWColor.pillFill)
+                    .frame(height: Self.track)
+                Capsule()
+                    .fill(OWColor.accent)
+                    .frame(width: x + Self.knob / 2, height: Self.track)
+                Circle()
+                    .fill(OWColor.surface)
+                    .overlay(Circle().stroke(OWColor.accentDeep, lineWidth: 1.5))
+                    .frame(width: Self.knob, height: Self.knob)
+                    .offset(x: x)
+            }
+            .frame(height: Self.knob)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { g in
+                        let raw = Double((g.location.x - Self.knob / 2) / usable)
+                        let span = range.upperBound - range.lowerBound
+                        let stepped = (raw * span / step).rounded() * step + range.lowerBound
+                        value = min(max(stepped, range.lowerBound), range.upperBound)
+                    }
+                    .onEnded { _ in onCommit?() }
+            )
+            .accessibilityElement()
+            .accessibilityValue(String(format: "%.2f", value))
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: value = min(value + step, range.upperBound)
+                case .decrement: value = max(value - step, range.lowerBound)
+                default: break
+                }
+                onCommit?()
+            }
+        }
+        .frame(height: Self.knob)
+    }
+}
+
+// MARK: - OWTextField (branded field — .roundedBorder draws a system bezel on cream)
+
+struct OWTextField: View {
+    let placeholder: String
+    @Binding var text: String
+    var isError: Bool = false
+
+    var body: some View {
+        TextField(placeholder, text: $text)
+            .textFieldStyle(.plain)
+            .font(OWFont.body(11))
+            .foregroundColor(OWColor.ink)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 6).fill(OWColor.pickerBg))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(isError ? OWColor.danger : OWColor.pickerBorder, lineWidth: 1)
+            )
+    }
+}
+
 /// A permission row that *looks* clickable — the plain status row gave no hint that
 /// tapping opens System Settings, so nobody discovered it.
 struct OWPermissionRow: View {

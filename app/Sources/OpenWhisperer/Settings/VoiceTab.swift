@@ -29,41 +29,36 @@ struct VoiceTab: View {
                     OWPickerRow(label: "Speed", labelWidth: 62) {
                         HStack(spacing: 8) {
                             // Bounds MUST equal TTSSpeed.min/max (see TTSSpeed.swift).
-                            Slider(value: $selectedSpeed, in: 0.7...1.5, step: 0.05)
-                                .tint(OWColor.accent)
-                                .help("How fast replies are read aloud. 1× is the default Kokoro rate.")
+                            // Writes once on release, not on every 0.05 step.
+                            OWSlider(value: $selectedSpeed, range: 0.7...1.5) {
+                                try? String(format: "%.2f", selectedSpeed)
+                                    .write(to: Paths.ttsSpeed, atomically: true, encoding: .utf8)
+                            }
+                            .help("How fast replies are read aloud. 1× is the default Kokoro rate.")
                             Text(SettingsData.multiplierLabel(selectedSpeed))
                                 .font(OWFont.body(11))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(OWColor.inkSoft)
                                 .monospacedDigit()
                                 .frame(width: 34, alignment: .trailing)
                         }
                         .frame(maxWidth: .infinity)
                     }
-                    .onChange(of: selectedSpeed) { _, newValue in
-                        try? String(format: "%.2f", newValue)
-                            .write(to: Paths.ttsSpeed, atomically: true, encoding: .utf8)
-                    }
-
-                    OWInternalDivider()
 
                     OWPickerRow(label: "Volume", labelWidth: 62) {
                         HStack(spacing: 8) {
                             // Bounds MUST equal TTSVolume.min/max (see TTSVolume.swift).
-                            Slider(value: $selectedVolume, in: 0.3...2.0, step: 0.05)
-                                .tint(OWColor.accent)
-                                .help("How loud replies are read aloud. 1× is normal; higher may clip.")
+                            OWSlider(value: $selectedVolume, range: 0.3...2.0) {
+                                try? String(format: "%.2f", selectedVolume)
+                                    .write(to: Paths.ttsVolume, atomically: true, encoding: .utf8)
+                            }
+                            .help("How loud replies are read aloud. 1× is normal; higher may clip.")
                             Text(SettingsData.multiplierLabel(selectedVolume))
                                 .font(OWFont.body(11))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(OWColor.inkSoft)
                                 .monospacedDigit()
                                 .frame(width: 34, alignment: .trailing)
                         }
                         .frame(maxWidth: .infinity)
-                    }
-                    .onChange(of: selectedVolume) { _, newValue in
-                        try? String(format: "%.2f", newValue)
-                            .write(to: Paths.ttsVolume, atomically: true, encoding: .utf8)
                     }
                 }
             }
@@ -73,7 +68,7 @@ struct VoiceTab: View {
                     OWCardHeader(title: "Response", icon: "text.bubble",
                                  help: "How much of a reply is spoken, and on which turns.")
 
-                    OWPickerRow(label: "Detail", labelWidth: 62) {
+                    OWPickerRow(label: "Length", labelWidth: 62) {
                         OWMenuPicker(selection: $selectedStyle, options: SettingsData.styleLevels)
                             .frame(maxWidth: .infinity)
                     }
@@ -81,6 +76,7 @@ struct VoiceTab: View {
                         try? newValue.write(to: Paths.ttsStyle, atomically: true, encoding: .utf8)
                     }
 
+                    // Self-describing options — the explanatory caption is no longer needed.
                     OWPickerRow(label: "Speak", labelWidth: 62) {
                         OWMenuPicker(selection: $selectedResponse, options: SettingsData.responseModes)
                             .frame(maxWidth: .infinity)
@@ -88,10 +84,6 @@ struct VoiceTab: View {
                     .onChange(of: selectedResponse) { _, newValue in
                         try? newValue.write(to: Paths.ttsResponseMode, atomically: true, encoding: .utf8)
                     }
-
-                    Text("when Voice = only turns you dictated; Always = every turn.")
-                        .font(OWFont.caption())
-                        .foregroundColor(.secondary)
                 }
             }
         }

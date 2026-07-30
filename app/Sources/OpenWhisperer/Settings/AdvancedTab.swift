@@ -37,9 +37,11 @@ struct AdvancedTab: View {
                         )
                     }
 
+                    // Destructive: must not look identical to "Server Log".
                     Button(action: deleteModels) {
-                        Label("Delete Downloaded Models…", systemImage: "trash")
+                        Label("Delete downloaded models…", systemImage: "trash")
                             .frame(maxWidth: .infinity)
+                            .foregroundColor(OWColor.danger)
                     }
                     .buttonStyle(OWRowButtonStyle())
 
@@ -86,7 +88,19 @@ struct AdvancedTab: View {
                             .transition(.opacity)
                     }
 
-                    ModernDiagnosticRow(label: "Server reachable", ok: serverReachable)
+                    // Tri-state: a stopped server is off on purpose, not an error.
+                    if serverManager.status == .stopped {
+                        ModernDiagnosticRow(label: "Stopped", ok: false, notInstalled: true)
+                    } else {
+                        ModernDiagnosticRow(label: "Reachable on :\(serverManager.port)",
+                                            ok: serverReachable)
+                    }
+
+                    if serverManager.status != .stopped {
+                        Text("Stop the server to change the port.")
+                            .font(OWFont.caption())
+                            .foregroundColor(OWColor.inkFaint)
+                    }
                 }
             }
 

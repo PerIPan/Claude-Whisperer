@@ -31,8 +31,9 @@ enum SettingsData {
     ]
 
     /// When replies are spoken; values match what `voice-context.sh` reads.
+    /// Labels are self-describing so no explanatory caption is needed.
     static let responseModes: [(id: String, label: String)] = [
-        ("voice", "when Voice"), ("always", "Always"),
+        ("voice", "Only when I dictate"), ("always", "On every turn"),
     ]
 
     static let focusApps: [(id: String, label: String)] = [
@@ -43,7 +44,7 @@ enum SettingsData {
         ("Fleet", "Fleet (JetBrains)"), ("Claude", "Claude (Desktop)"),
         ("Terminal", "Terminal (macOS)"), ("iTerm2", "iTerm2 (Terminal)"),
         ("Warp", "Warp (Terminal)"), ("Alacritty", "Alacritty (Terminal)"),
-        ("Ghostty", "Ghostty (Terminal)"), ("CUSTOM", "CUSTOM"),
+        ("Ghostty", "Ghostty (Terminal)"), ("CUSTOM", "Custom…"),
     ]
 
     /// "1×", "1.15×" — trims trailing zeros so slider readouts stay tidy.

@@ -124,7 +124,7 @@ struct DictationTab: View {
                         if dictationManager.isCalibrating {
                             HStack(spacing: 6) {
                                 ProgressView().controlSize(.small)
-                                Text("Calibrating microphone...")
+                                Text("Calibrating microphone…")
                                     .font(OWFont.caption())
                                     .foregroundColor(OWColor.warn)
                             }
@@ -134,7 +134,7 @@ struct DictationTab: View {
                                 Image(systemName: "speaker.wave.2.fill")
                                     .font(.system(size: 9))
                                     .foregroundColor(OWColor.accentDeep)
-                                Text("say \"hold on\" to interrupt TTS")
+                                Text("Say \"hold on\" to interrupt the reply")
                                     .font(OWFont.caption())
                                     .foregroundColor(.secondary)
                             }
@@ -166,7 +166,7 @@ struct DictationTab: View {
                             }
                         ),
                         options: [
-                            (id: "off", label: "OFF"),
+                            (id: "off", label: "Off"),
                             (id: OverlayStyle.wave.rawValue, label: "Wave"),
                             (id: OverlayStyle.ledBars.rawValue, label: "LED Bars"),
                             (id: OverlayStyle.graph.rawValue, label: "Graph"),
@@ -233,7 +233,7 @@ struct DictationTab: View {
                 OWCardHeader(title: "App Focus", icon: "arrow.right.square",
                              help: "Optionally bring a target app to the front before inserting dictated text, press Enter for you, and hand focus back.")
 
-                OWCheckbox(label: "auto-focus", isOn: $autoFocusEnabled)
+                OWCheckbox(label: "Switch to a target app before typing", isOn: $autoFocusEnabled)
                     .onChange(of: autoFocusEnabled) { _, enabled in
                         if enabled {
                             if focusAppName.isEmpty {
@@ -266,9 +266,7 @@ struct DictationTab: View {
                         .frame(maxWidth: .infinity)
 
                         if focusSelection == "CUSTOM" {
-                            TextField("App name", text: $customFocusApp)
-                                .textFieldStyle(.roundedBorder)
-                                .font(OWFont.body(11))
+                            OWTextField(placeholder: "App name", text: $customFocusApp)
                                 .onChange(of: customFocusApp) { _, newValue in
                                     if !newValue.isEmpty {
                                         focusAppName = newValue
@@ -277,7 +275,7 @@ struct DictationTab: View {
                                 }
                         }
 
-                        OWCheckbox(label: "with return", isOn: $autoFocusReturn)
+                        OWCheckbox(label: "Return to the previous app afterwards", isOn: $autoFocusReturn)
                             .onChange(of: autoFocusReturn) { _, enabled in
                                 if enabled {
                                     try? "on".write(to: Paths.autoFocusReturn, atomically: true, encoding: .utf8)
@@ -289,7 +287,7 @@ struct DictationTab: View {
                     .padding(.leading, 6)
                 }
 
-                OWCheckbox(label: "auto-submit", isOn: $autoSubmit)
+                OWCheckbox(label: "Press Return after inserting text", isOn: $autoSubmit)
                     .onChange(of: autoSubmit) { _, enabled in
                         if enabled {
                             try? "on".write(to: Paths.autoSubmitFlag, atomically: true, encoding: .utf8)
@@ -341,12 +339,12 @@ struct DictationTab: View {
     }
 
     private var stateLabel: String {
-        if dictationManager.isCalibrating { return "Calibrating..." }
-        if dictationManager.ttsPlaying { return "Playing..." }
+        if dictationManager.isCalibrating { return "Calibrating…" }
+        if dictationManager.ttsPlaying { return "Playing…" }
         switch dictationManager.recorderState {
-        case .recording: return "Recording..."
-        case .uploading: return "Transcribing..."
-        case .listening: return "Listening..."
+        case .recording: return "Recording…"
+        case .uploading: return "Transcribing…"
+        case .listening: return "Listening…"
         case .idle: return dictationManager.speakArmed ? "Standby · will speak" : "Standby"
         }
     }
