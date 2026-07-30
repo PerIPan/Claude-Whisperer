@@ -16,6 +16,7 @@ enum InteractionMode: String, CaseIterable {
 
     var description: String {
         switch self {
+        // Lower-case, no terminal period — the house style for these hint lines.
         case .pressToTalk: return "press key to start, press again to stop"
         case .holdToTalk: return "hold key to record, release to transcribe"
         case .handsFree: return "say \"initiate\" to record, \"hold on\" to interrupt, simply keep silent to transcribe"

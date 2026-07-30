@@ -7,7 +7,7 @@
 Full interactive Voice mode for [Claude Code](https://claude.ai/claude-code), [Codex CLI](https://github.com/openai/codex), Antigravity, and Pi on Apple Silicon. Talk to your AI, hear it talk back — all running locally on your Mac. Three voice input modes, voice personas, Auto-Focus & easy setup. Open Source.
 
 <p align="center">
-  <img src="screenshot.png" width="320" alt="Open Whisperer menubar app">
+  <img src="screenshot.png" width="514" alt="Open Whisperer Settings — the Dictation tab">
 </p>
 
 Build from source or DMG, do not pay the 99/year so you would have to allow it to run.
@@ -105,11 +105,7 @@ On first launch, the app:
 - Loads both models on the Apple Neural Engine
 - Starts the in-app TTS server automatically (loopback only, port 8000)
 
-While that one-time download and Neural-Engine compile runs, the menu shows live progress so you know it isn't stuck (the overlay is signal-only — just a waveform and status dot):
-
-<p align="center">
-  <img src="screenshot-loading-menu.png" width="460" alt="Open Whisperer menu preparing the models on first launch">
-</p>
+While that one-time download and Neural-Engine compile runs, Settings opens on **General**, which shows live progress so you know it isn't stuck. The menubar icon shows an hourglass for the same reason.
 
 The menubar icon is a small dropdown — **Settings…**, a **Show Overlay** toggle, and **Quit**. The icon itself doubles as a status light: an hourglass while models load, a speaker when your next reply will be spoken, and a warning triangle if a permission is missing.
 
