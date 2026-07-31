@@ -7,7 +7,15 @@
 Full interactive Voice mode for [Claude Code](https://claude.ai/claude-code), [Codex CLI](https://github.com/openai/codex), Antigravity, and Pi on Apple Silicon. Talk to your AI, hear it talk back — all running locally on your Mac. Three voice input modes, voice personas, Auto-Focus & easy setup. Open Source.
 
 <p align="center">
-  <img src="screenshot.png" width="514" alt="Open Whisperer Settings — the Dictation tab">
+  <img src="docs/screenshots/dictation.png" width="45%" alt="Settings — Dictation tab: mode, trigger key, overlay style, language, custom vocabulary, App Focus">
+  <img src="docs/screenshots/voice.png" width="45%" alt="Settings — Voice tab: voice picker, speed and volume, spoken-reply length and when replies are spoken">
+</p>
+<p align="center">
+  <img src="docs/screenshots/agents.png" width="45%" alt="Settings — Agents tab: Claude Code, Codex CLI, Pi and Antigravity, each with its own connect button">
+  <img src="docs/screenshots/advanced.png" width="45%" alt="Settings — Advanced tab: model status, the local TTS server and port, logs and diagnostics">
+</p>
+<p align="center">
+  <img src="docs/screenshots/general.png" width="45%" alt="Settings — General tab: version, the speech engines in use, permissions and launch at login">
 </p>
 
 Build from source or DMG, do not pay the 99/year so you would have to allow it to run.
