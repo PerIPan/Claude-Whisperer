@@ -701,8 +701,17 @@ class DictationManager: ObservableObject {
 
     // MARK: - Will-speak indicator
 
-    /// Matches the 900 s voice_turn TTL in voice-context.sh / codex-tts-hook.sh.
+    /// Matches the 900 s voice_turn TTL in voice-context.sh / codex-tts-hook.sh. This is the
+    /// window in which a dictated prompt can still be *claimed*, so it must not be shortened
+    /// independently of the hooks.
     private static let voiceTurnTTL: TimeInterval = 900
+
+    /// How long the will-speak indicator stays lit on a signal nobody has claimed —
+    /// deliberately far shorter than `voiceTurnTTL`. The hook must still match a dictation
+    /// submitted minutes later, but the *icon* has no reason to wait that long: dictating and
+    /// then not submitting (or editing the prompt first) used to pin the speaker for the full
+    /// 15 minutes, which reads as a stuck indicator rather than an armed one.
+    private static let speakArmedTTL: TimeInterval = 90
 
     /// Apps where a hooked CLI prompt could plausibly live — the curated auto-focus
     /// list (terminals + editors) plus common extra terminals. Lowercased names.
@@ -731,6 +740,7 @@ class DictationManager: ObservableObject {
     /// watch for the transition). Cheap: two stat/read calls per tick, only while armed.
     func refreshSpeakArmed() {
         dispatchPrecondition(condition: .onQueue(.main))
+        Self.sweepExpiredVoiceTurn()
         let armed = Self.computeSpeakArmed(voiceTurnEligible: lastDictationTargetIsCLIHost)
         if speakArmed != armed { speakArmed = armed }
         if armed, speakArmedTimer == nil {
@@ -741,6 +751,25 @@ class DictationManager: ObservableObject {
             speakArmedTimer?.invalidate()
             speakArmedTimer = nil
         }
+    }
+
+    /// Delete a `voice_turn` that can no longer be claimed by anyone.
+    ///
+    /// The hooks sweep a stale signal too, but only when they happen to run — dictate into an
+    /// app that never submits to an agent and the file otherwise sits on disk indefinitely
+    /// (observed: a signal still present 1911 s after it was written).
+    ///
+    /// Uses the full `voiceTurnTTL`, **not** the shorter `speakArmedTTL`: the indicator gives
+    /// up early, but a dictation the user submits several minutes later must still match, so
+    /// deleting on the indicator's schedule would silence legitimately dictated turns.
+    /// A signal with no parseable timestamp is left alone — the hooks treat that as
+    /// never-expiring and can still claim it by hash.
+    private static func sweepExpiredVoiceTurn() {
+        guard let contents = try? String(contentsOf: Paths.voiceTurn, encoding: .utf8) else { return }
+        let lines = contents.split(separator: "\n")
+        guard lines.count >= 2, let ts = TimeInterval(lines[1]) else { return }
+        guard Date().timeIntervalSince1970 - ts > voiceTurnTTL else { return }
+        try? FileManager.default.removeItem(at: Paths.voiceTurn)
     }
 
     private static func computeSpeakArmed(voiceTurnEligible: Bool) -> Bool {
@@ -756,7 +785,7 @@ class DictationManager: ObservableObject {
            let contents = try? String(contentsOf: Paths.voiceTurn, encoding: .utf8) {
             let lines = contents.split(separator: "\n")
             if lines.count >= 2, let ts = TimeInterval(lines[1]),
-               now.timeIntervalSince1970 - ts <= voiceTurnTTL {
+               now.timeIntervalSince1970 - ts <= speakArmedTTL {
                 return true
             }
         }
