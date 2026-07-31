@@ -284,7 +284,6 @@ struct DictationTab: View {
                                 }
                             }
                     }
-                    .padding(.leading, 6)
                 }
 
                 OWCheckbox(label: "Press Return after inserting text", isOn: $autoSubmit)

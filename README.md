@@ -16,7 +16,7 @@ The command to bypass Gatekeeper for the DMG:
 xattr -cr /Applications/OpenWhisperer.app
 
 If you want to do it on the DMG itself before opening:
-xattr -d com.apple.quarantine ~/Downloads/OpenWhisperer-1.11.0.dmg
+xattr -d com.apple.quarantine ~/Downloads/OpenWhisperer-2.0.0.dmg
 
 
 ## What It Does
@@ -26,6 +26,14 @@ You use your coding agent — **Claude Code, Codex, Antigravity, or Pi** — nor
 Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ## What's New
+
+### 2.0.0
+
+- **It speaks Dutch, German, Polish, Russian and Ukrainian** — languages Kokoro has no voice for. Until now those replies were read aloud by an *English* voice, which isn't "accented" so much as unintelligible: feed the old Dutch audio to a speech recognizer and it comes back as `"D test Slagin New Alemolol."` (~100% error). The new voices come back as the sentence (~4%).
+- **A second engine, picked by measurement** — **Supertonic-3** runs alongside Kokoro (both already inside the app's speech library, so there's no new binary to trust). It's ~10× faster than the existing English voices on the Neural Engine, so spoken replies start sooner.
+- **Your reply is written in the voice's language** — picking a Dutch voice isn't enough on its own, since a Dutch voice reading English text helps nobody. Your agent is now told to write the spoken summary in that language; your on-screen reply is untouched.
+- **Nothing changes if you're on English** — the multilingual model (~264 MB) downloads only when you actually pick one of these voices, and every existing voice setting keeps working.
+- **Smaller Settings window**, a **Recording** entry in the menubar (placeholder for now), and a quieter overlay and Agents tab.
 
 ### 1.11.0
 
@@ -98,7 +106,7 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ## Install
 
-[**Download OpenWhisperer-1.11.0.dmg**](https://github.com/PerIPan/OpenWhisperer/releases/download/v1.11.0/OpenWhisperer-1.11.0.dmg) — drag to Applications and launch.
+[**Download OpenWhisperer-2.0.0.dmg**](https://github.com/PerIPan/OpenWhisperer/releases/download/v2.0.0/OpenWhisperer-2.0.0.dmg) — drag to Applications and launch.
 
 On first launch, the app:
 - Downloads the Whisper (speech-to-text) and Kokoro (text-to-speech) CoreML models
@@ -107,7 +115,7 @@ On first launch, the app:
 
 While that one-time download and Neural-Engine compile runs, Settings opens on **General**, which shows live progress so you know it isn't stuck. The menubar icon shows an hourglass for the same reason.
 
-The menubar icon is a small dropdown — **Settings…**, a **Show Overlay** toggle, and **Quit**. The icon itself doubles as a status light: an hourglass while models load, a speaker when your next reply will be spoken, and a warning triangle if a permission is missing.
+The menubar icon is a small dropdown — **Settings…**, a **Show Overlay** toggle, **Recording…**, and **Quit**. The icon itself doubles as a status light: an hourglass while models load, a speaker when your next reply will be spoken, and a warning triangle if a permission is missing.
 
 Everything else lives in the **Settings** window (⌘,), across five tabs:
 
@@ -119,14 +127,14 @@ Everything else lives in the **Settings** window (⌘,), across five tabs:
 - **App Focus** — switch to a target app before typing, press Return afterwards, and hand focus back
 
 **Voice**
-- **Voice** — the full Kokoro-82M roster (~54 voices, grouped by language); non-default voices download on demand
+- **Voice** — the full Kokoro-82M roster (~54 voices, grouped by language), plus **Dutch, German, Polish, Russian and Ukrainian** voices that Kokoro can't speak; non-default voices download on demand
 - **Speed** (0.7×–1.5×, default 1.1×) and **Volume**
 - **Length** — how much is spoken: Terse, Normal (default), or Rich
 - **Speak** — Only when I dictate (default), or On every turn
 
 **Agents** — all four agents (Claude Code, Codex CLI, Pi, Antigravity) with their own status and **Connect** button; connect as many as you use. Each has an ⓘ explaining exactly which files get written.
 
-**Advanced** — model status (Whisper STT / Kokoro TTS), the TTS server and port, delete downloaded models, server/events logs, and Copy Diagnostics.
+**Advanced** — model status (Whisper STT / TTS engines), the TTS server and port, delete downloaded models, server/events logs, and Copy Diagnostics.
 
 **General** (the logo tab, on the right) — first-run and model-loading progress, launch at login, and the permission list (Accessibility, Microphone, and Speech Recognition in Hands-Free). Each row opens the matching System Settings pane; the logo tab is badged whenever a grant is missing.
 
@@ -215,12 +223,12 @@ Most settings are configured in the Settings window (voice, volume, language, ho
 
 | Variable | Default | Used by | Description |
 |----------|---------|---------|-------------|
-| `TTS_VOICE` | `af_heart` | hooks, `speak.sh` | Kokoro voice name (the menubar voice picker overrides this) |
+| `TTS_VOICE` | `af_heart` | hooks, `speak.sh` | Voice id — a Kokoro name (`af_heart`) or a multilingual id (`supertonic:nl:F1`); the menubar voice picker overrides this |
 | `TTS_PLAY_URL` | `http://localhost:8000/v1/audio/play` | hooks | In-app streaming-playback endpoint (loopback only) |
 | `TTS_URL` | `http://localhost:8000/v1/audio/speech` | `speak.sh` | Blocking synthesize-to-WAV endpoint |
 | `TTS_VOLUME` | `1` | `speak.sh` | Playback volume (the in-app player uses the menubar volume setting instead) |
 | `OW_TTS_STYLE` | menubar **Style** | hooks | Per-project spoken-summary style (`terse`/`normal`/`rich`/`full`); overrides the global `tts_style` |
-| `OW_TTS_VOICE` | menubar voice | hooks | Per-project Kokoro voice; overrides the global `tts_voice` |
+| `OW_TTS_VOICE` | menubar voice | hooks | Per-project voice id, Kokoro or `supertonic:<lang>:<style>` (any of its 31 languages, not just the five in the picker); overrides the global `tts_voice` |
 | `OW_TTS_RESPONSE` | menubar **Response** | hooks | Per-project response mode (`voice`/`always`); overrides the global `tts_response_mode` |
 
 > **Tip:** Setting a specific language (e.g. English) instead of auto-detect prevents the model from hallucinating text in other languages during silence or background noise.
@@ -269,7 +277,7 @@ chmod +x build-dmg.sh
 ./build-dmg.sh
 ```
 
-This produces `OpenWhisperer.app` and `OpenWhisperer-1.11.0.dmg` in `app/.build/`. Launch the app — on first launch it downloads the Whisper and Kokoro models, then starts the in-app TTS server on `localhost:8000` automatically. (For a plain debug build during development, run `swift build` from `app/`.)
+This produces `OpenWhisperer.app` and `OpenWhisperer-2.0.0.dmg` in `app/.build/`. Launch the app — on first launch it downloads the Whisper and Kokoro models, then starts the in-app TTS server on `localhost:8000` automatically. (For a plain debug build during development, run `swift build` from `app/`.)
 
 ### Step 2: Wire up the hooks
 

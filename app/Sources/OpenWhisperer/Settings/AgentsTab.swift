@@ -65,6 +65,16 @@ struct AgentsTab: View {
                         .foregroundColor(OWColor.ink)
                     // Visible ⓘ: spells out exactly which files connecting touches.
                     OWInfoTip(text: connectHelp(for: platform))
+                    // Setup instructions live next to the agent they describe, not beside the
+                    // Connect button where a text link competed with the row's primary action.
+                    Button { ConfigManager.showHookInstructions(for: platform) } label: {
+                        Image(systemName: "questionmark.circle")
+                            .font(.system(size: 11))
+                            .foregroundColor(OWColor.inkFaint)
+                    }
+                    .buttonStyle(.plain)
+                    .help("How it works")
+                    .accessibilityLabel("How \(platform.label) works")
                 }
                 Text(isConnected ? "Connected" : "Not connected")
                     .font(OWFont.caption())
@@ -72,10 +82,6 @@ struct AgentsTab: View {
             }
 
             Spacer(minLength: 6)
-
-            Button("How it works") { ConfigManager.showHookInstructions(for: platform) }
-                .buttonStyle(.link)
-                .font(OWFont.caption())
 
             Button(isConnected ? "Reconnect" : "Connect") { connect(platform) }
                 .buttonStyle(OWRowButtonStyle(tinted: isConnected, urgent: !isConnected))

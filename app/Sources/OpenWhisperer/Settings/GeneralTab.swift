@@ -20,23 +20,6 @@ struct GeneralTab: View {
             aboutCard
 
             OWCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    OWCardHeader(title: "Startup", icon: "power",
-                                 help: "Launch Open Whisperer automatically when you log in.")
-                    OWCheckbox(label: "Launch at login", isOn: $launchAtLogin)
-                        .onChange(of: launchAtLogin) { _, enabled in
-                            let service = SMAppService.mainApp
-                            do {
-                                if enabled { try service.register() } else { try service.unregister() }
-                            } catch {
-                                NSLog("Login item toggle failed: \(error)")
-                                DispatchQueue.main.async { launchAtLogin = service.status == .enabled }
-                            }
-                        }
-                }
-            }
-
-            OWCard {
                 VStack(alignment: .leading, spacing: 8) {
                     OWCardHeader(title: allPermissionsGranted ? "Permissions" : "Permissions Required",
                                  icon: "lock.shield",
@@ -71,6 +54,7 @@ struct GeneralTab: View {
                 }
             }
 
+            startupCard
         }
         // Version now lives in the tab bar (right of the tabs), so no footer here.
         .onAppear {
@@ -88,6 +72,27 @@ struct GeneralTab: View {
             DispatchQueue.global(qos: .userInitiated).async {
                 let enabled = SMAppService.mainApp.status == .enabled
                 DispatchQueue.main.async { launchAtLogin = enabled }
+            }
+        }
+    }
+
+    /// Set-once preference, so it sits last — below Permissions, which is the tab's
+    /// actionable content (a missing grant breaks dictation outright).
+    private var startupCard: some View {
+        OWCard {
+            VStack(alignment: .leading, spacing: 10) {
+                OWCardHeader(title: "Startup", icon: "power",
+                             help: "Launch Open Whisperer automatically when you log in.")
+                OWCheckbox(label: "Launch at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, enabled in
+                        let service = SMAppService.mainApp
+                        do {
+                            if enabled { try service.register() } else { try service.unregister() }
+                        } catch {
+                            NSLog("Login item toggle failed: \(error)")
+                            DispatchQueue.main.async { launchAtLogin = service.status == .enabled }
+                        }
+                    }
             }
         }
     }
@@ -138,7 +143,7 @@ struct GeneralTab: View {
                           detail: "WhisperKit large-v3 turbo — on the Apple Neural Engine, 99 languages")
                 engineRow(icon: "speaker.wave.2",
                           title: "Text to speech",
-                          detail: "Kokoro-82M — ~54 voices across 9 languages")
+                          detail: "Kokoro-82M — ~54 voices across 9 languages, plus Supertonic-3 for Dutch, German, Polish, Russian and Ukrainian")
 
                 OWInternalDivider()
 

@@ -649,9 +649,13 @@ struct WaveStyleView: View {
                 Circle()
                     .fill(dotColor)
                     .frame(width: 8, height: 8)
-                Text(label)
-                    .font(.custom("Outfit", size: 10))
-                    .foregroundColor(dotColor)
+                // Skipped entirely when empty (idle): an empty Text still occupies a layout
+                // slot, so it would consume a second HStack gap for nothing.
+                if !label.isEmpty {
+                    Text(label)
+                        .font(.custom("Outfit", size: 10))
+                        .foregroundColor(dotColor)
+                }
                 Spacer()
                 if statusText == nil, recorder.state == .recording {
                     Text(recordingHint)
@@ -706,7 +710,8 @@ struct WaveStyleView: View {
         case .recording: return "Recording..."
         case .uploading: return "Transcribing..."
         case .listening: return "Listening..."
-        case .idle: return "Standby"
+        // Idle is the resting state — the dot alone carries it, so no word is shown.
+        case .idle: return ""
         }
     }
 

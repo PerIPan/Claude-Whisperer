@@ -30,7 +30,7 @@ struct AdvancedTab: View {
                         )
                         OWInternalDivider()
                         ModernStatusRow(
-                            label: "Kokoro TTS",
+                            label: "TTS engines",
                             subtitle: serverManager.ttsModel,
                             port: "\(serverManager.port)",
                             status: serverManager.status

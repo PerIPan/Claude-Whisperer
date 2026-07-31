@@ -76,6 +76,8 @@ private struct MenuBarMenu: View {
             set: { $0 ? overlay.show() : overlay.hide() }
         ))
 
+        Button("Recording…") { RecordingWindow.show() }
+
         Divider()
 
         Button("Quit Open Whisperer") { NSApplication.shared.terminate(nil) }
