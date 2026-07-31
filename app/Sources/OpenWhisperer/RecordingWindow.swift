@@ -28,7 +28,7 @@ final class RecordingWindow: NSObject, NSWindowDelegate {
                 backing: .buffered,
                 defer: false
             )
-            w.title = "Recording"
+            w.title = "Record Voice & Text"
             w.center()
             w.isReleasedWhenClosed = false
             w.delegate = owner
@@ -55,7 +55,7 @@ private struct RecordingPlaceholderView: View {
                 .font(OWFont.title(17))
                 .foregroundColor(OWColor.ink)
 
-            Text("Recording isn't built yet. It'll show up here in a future release.")
+            Text("Recording your voice and the text it produces isn't built yet. It'll show up here in a future release.")
                 .font(OWFont.caption())
                 .foregroundColor(OWColor.inkSoft)
                 .multilineTextAlignment(.center)

@@ -109,11 +109,18 @@ struct OWWindowBackground: NSViewRepresentable {
         DispatchQueue.main.async { Self.apply(to: nsView.window) }
     }
 
+    /// Solid, deliberately not glass. Translucency was tried on 2026-07-31 and reverted:
+    /// `NSVisualEffectView` needs `isOpaque = false` plus a clear background to blur what is
+    /// behind it, which also removes the window's visible edge and its drag region, and leaves
+    /// the titlebar showing raw desktop because the effect view covers only the content area.
+    /// Doing it properly needs `.fullSizeContentView` and a manual titlebar inset — and the
+    /// menubar dropdown is a system-drawn `NSMenu` that could never be matched anyway.
     private static func apply(to window: NSWindow?) {
         guard let window else { return }
         window.backgroundColor = .ow(0xFAF7F1, 0x1E1B16)
     }
 }
+
 
 // MARK: - Brand fonts
 

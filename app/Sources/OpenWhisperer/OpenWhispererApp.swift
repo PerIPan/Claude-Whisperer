@@ -76,7 +76,7 @@ private struct MenuBarMenu: View {
             set: { $0 ? overlay.show() : overlay.hide() }
         ))
 
-        Button("Recording…") { RecordingWindow.show() }
+        Button("Record Voice & Text") { RecordingWindow.show() }
 
         Divider()
 

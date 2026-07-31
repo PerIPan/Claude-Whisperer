@@ -34,7 +34,7 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 - **Your reply is written in the voice's language** — picking a Dutch voice isn't enough on its own, since a Dutch voice reading English text helps nobody. Your agent is now told to write the spoken summary in that language; your on-screen reply is untouched.
 - **Nothing changes if you're on English** — the multilingual model (~264 MB) downloads only when you actually pick one of these voices, and every existing voice setting keeps working.
 - **A "Full" length and an "Only when I'm needed" mode** — Full speaks a paragraph that explains the reasoning rather than just summarizing. "Only when I'm needed" stays silent while work succeeds and speaks up only when the turn ends on you: a question, a blocked step, an approval, or a failure — so you can walk away from a long run and be told when you're wanted.
-- **Smaller Settings window**, a **Recording** entry in the menubar (placeholder for now), and a quieter overlay and Agents tab.
+- **Smaller Settings window**, a **Record Voice & Text** entry in the menubar (placeholder for now), and a quieter overlay and Agents tab.
 
 <details>
 <summary><strong>Earlier releases — 1.6.x, 1.5.x</strong> (Antigravity & Pi, voice personas, native rewrite, streaming TTS)</summary>
@@ -90,7 +90,7 @@ On first launch, the app:
 
 While that one-time download and Neural-Engine compile runs, Settings opens on **General**, which shows live progress so you know it isn't stuck. The menubar icon shows an hourglass for the same reason.
 
-The menubar icon is a small dropdown — **Settings…**, a **Show Overlay** toggle, **Recording…**, and **Quit**. The icon itself doubles as a status light: an hourglass while models load, a speaker when your next reply will be spoken, and a warning triangle if a permission is missing.
+The menubar icon is a small dropdown — **Settings…**, a **Show Overlay** toggle, **Record Voice & Text**, and **Quit**. The icon itself doubles as a status light: an hourglass while models load, a speaker when your next reply will be spoken, and a warning triangle if a permission is missing.
 
 Everything else lives in the **Settings** window (⌘,), across five tabs:
 
