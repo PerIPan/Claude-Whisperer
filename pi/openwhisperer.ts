@@ -38,9 +38,21 @@ function nudgeLen(style: string): string {
       return "one short, plain spoken sentence";
     case "rich":
       return "a sentence or two of plain spoken summary";
+    case "full":
+      return "a spoken paragraph of four or five sentences";
     default:
       return "one plain spoken sentence";
   }
+}
+
+/// Extra instruction for the longest tier only — mirrors `resolve_depth_line` in
+/// hooks/voice-shared.sh. Without it, "full" reads as just a longer summary.
+function nudgeDepth(style: string): string {
+  if (style !== "full") return "";
+  return (
+    " Use that paragraph to explain your reasoning and any trade-offs, not just the conclusion" +
+    " — but keep it spoken prose, with no lists, headings, code, or file paths."
+  );
 }
 
 function debug(msg: string): void {
@@ -141,20 +153,34 @@ export default function (pi: ExtensionAPI) {
     const mode = readPref("OW_TTS_RESPONSE", "tts_response_mode", "voice");
     const isVoice = claimVoiceTurn(prompt);
 
-    // Response mode: "always" speaks every turn; "voice" (default, and any stale "text")
-    // speaks only dictated turns.
-    const speak = mode === "always" ? true : isVoice;
+    // Response mode: "always" speaks every turn; "needed" makes every turn a candidate but
+    // hands the decision to the model; "voice" (default, and any stale "text") speaks only
+    // dictated turns. Mirrors the mode table in hooks/voice-shared.sh.
+    const speak = mode === "always" || mode === "needed" ? true : isVoice;
 
     debug(`before_agent_start mode=${mode} isVoice=${isVoice} speak=${speak}`);
     if (!speak) return;
 
-    const len = nudgeLen(readPref("OW_TTS_STYLE", "tts_style", "normal"));
-    const voiceLine = isVoice ? "This turn was dictated by voice. " : "";
+    const style = readPref("OW_TTS_STYLE", "tts_style", "normal");
+    const len = nudgeLen(style);
+    const depth = nudgeDepth(style);
+    const tail =
+      ` Then write your full reply on screen as usual. Do not mention the tool in your written reply.`;
+
+    // "Only when I'm needed" cannot be decided here — this runs before the turn exists — so
+    // the gate is delegated to the model, exactly as the bash hooks do for the other agents.
     const nudge =
-      `${voiceLine}Before writing your on-screen reply, your FIRST action must be to call the ` +
-      `\`openwhisperer_speak\` tool exactly once, passing ${len} that summarizes your answer and stands alone ` +
-      `when heard. Then write your full reply on screen as usual. Do not skip the speak call, and ` +
-      `do not mention the tool in your written reply.`;
+      mode === "needed"
+        ? `Speak this reply ONLY if it needs something from me. First decide whether this turn ends on me: ` +
+          `you are asking a question, you are blocked, you need my approval for something risky or ` +
+          `destructive, or something failed and I have to choose what happens next. If so, your FIRST ` +
+          `action must be to call the \`openwhisperer_speak\` tool exactly once, passing ${len} that says ` +
+          `plainly what you need from me and stands alone when heard.${depth} If instead the work simply ` +
+          `succeeded and needs nothing from me, do NOT call the tool at all — staying silent is the ` +
+          `correct outcome.${tail}`
+        : `${isVoice ? "This turn was dictated by voice. " : ""}Before writing your on-screen reply, your ` +
+          `FIRST action must be to call the \`openwhisperer_speak\` tool exactly once, passing ${len} that ` +
+          `summarizes your answer and stands alone when heard.${depth} Do not skip the speak call.${tail}`;
 
     return {
       message: {

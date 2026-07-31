@@ -106,18 +106,91 @@ func voiceContextFailures() -> [String] {
         }
     }
 
-    // 9) full style → folds into the richest summary tier (a sentence or two), NOT a whole-reply nudge.
+    // 9) full style → its own longest tier since 2.0.0: a spoken paragraph that explains,
+    //    no longer folded into "rich". Still a spoken summary, NOT a whole-reply nudge.
     do {
         let s = newSandbox()
         s.writeVoiceTurn(forPrompt: "go"); s.writeTtsStyle("full")
         let r = Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"), sandbox: s)
         let n = nudge(r.stdout)
-        if n?.contains("a sentence or two") != true { fail("fullStyle: not richest tier: \(n?.debugDescription ?? "nil")") }
+        if n?.contains("a spoken paragraph") != true { fail("fullStyle: not the paragraph tier: \(n?.debugDescription ?? "nil")") }
+        if n?.contains("explain your reasoning") != true { fail("fullStyle: missing depth instruction") }
+        if n?.contains("a sentence or two") == true { fail("fullStyle: still folded into rich") }
         if n?.contains("entire reply") == true { fail("fullStyle: should not ask for whole reply") }
         if n?.contains("`speak` tool") != true { fail("fullStyle: missing speak-tool instruction") }
     }
 
-    // --- Response mode (tts_response_mode): voice (default) | always ---
+    // 9a) the depth instruction is exclusive to `full` — the other tiers stay lean.
+    for style in ["terse", "normal", "rich"] {
+        let s = newSandbox()
+        s.writeVoiceTurn(forPrompt: "go"); s.writeTtsStyle(style)
+        let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"), sandbox: s).stdout)
+        if n?.contains("explain your reasoning") == true {
+            fail("depthLineLeak: '\(style)' should not carry the paragraph depth instruction")
+        }
+        if n?.contains("a spoken paragraph") == true {
+            fail("depthLineLeak: '\(style)' should not use the paragraph length phrase")
+        }
+    }
+
+    // 9b) OW_TTS_STYLE=full overrides a global of a shorter tier, like the other styles do.
+    do {
+        let s = newSandbox()
+        s.writeVoiceTurn(forPrompt: "go"); s.writeTtsStyle("terse")
+        let r = Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"),
+                         sandbox: s, env: ["OW_TTS_STYLE": "full"])
+        let n = nudge(r.stdout)
+        if n?.contains("a spoken paragraph") != true { fail("fullOverride: \(n?.debugDescription ?? "nil")") }
+        if n?.contains("explain your reasoning") != true { fail("fullOverride: depth line missing") }
+    }
+
+    // --- Response mode (tts_response_mode): voice (default) | always | needed ---
+
+    // 10a) needed + typed turn → a nudge IS emitted (every turn is a candidate), but it must
+    //      hand the decision to the model rather than demanding speech unconditionally.
+    do {
+        let s = newSandbox(); s.writeResponseMode("needed")
+        let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "typed thing", session: "s-nt"), sandbox: s).stdout)
+        if n?.contains("`speak` tool") != true { fail("neededTyped: missing speak-tool nudge: \(n?.debugDescription ?? "nil")") }
+        if n?.contains("ONLY if it needs something from me") != true { fail("neededTyped: missing conditional gate") }
+        if n?.contains("do NOT call the tool at all") != true { fail("neededTyped: missing silence branch") }
+        // The unconditional compliance line belongs to the other modes; here skipping is correct.
+        if n?.contains("Do not skip the speak call") == true { fail("neededTyped: must not demand an unconditional call") }
+    }
+
+    // 10b) needed + dictated turn → same conditional nudge, and the signal is still claimed
+    //      so a later typed turn can't re-match it.
+    do {
+        let s = newSandbox(); s.writeResponseMode("needed"); s.writeVoiceTurn(forPrompt: "do it")
+        let r = Hook.run("voice-context.sh", stdin: input(prompt: "do it", session: "s-nv"), sandbox: s)
+        let n = nudge(r.stdout)
+        if n?.contains("ONLY if it needs something from me") != true { fail("neededVoice: missing conditional gate") }
+        if s.voiceTurnExists() { fail("neededVoice: voice_turn should be claimed") }
+    }
+
+    // 10c) the conditional gate is exclusive to `needed` — voice/always stay unconditional.
+    for mode in ["voice", "always"] {
+        let s = newSandbox(); s.writeResponseMode(mode); s.writeVoiceTurn(forPrompt: "go")
+        let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s-u"), sandbox: s).stdout)
+        if n?.contains("ONLY if it needs something from me") == true {
+            fail("conditionalLeak: '\(mode)' must not carry the needed-mode gate")
+        }
+        if n?.contains("Do not skip the speak call") != true {
+            fail("conditionalLeak: '\(mode)' lost the unconditional compliance line")
+        }
+    }
+
+    // 10d) OW_TTS_RESPONSE=needed overrides a global of "voice" on a typed turn, which would
+    //      otherwise be silent — proving the per-project override reaches the new mode.
+    do {
+        let s = newSandbox(); s.writeResponseMode("voice")
+        let r = Hook.run("voice-context.sh", stdin: input(prompt: "typed thing", session: "s-no"),
+                         sandbox: s, env: ["OW_TTS_RESPONSE": "needed"])
+        if nudge(r.stdout)?.contains("ONLY if it needs something from me") != true {
+            fail("neededOverride: \(nudge(r.stdout)?.debugDescription ?? "nil")")
+        }
+    }
+
 
     // 10) always + typed turn → speak-tool nudge, no marker.
     do {

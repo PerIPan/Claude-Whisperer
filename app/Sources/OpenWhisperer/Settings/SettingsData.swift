@@ -24,16 +24,18 @@ enum SettingsData {
         ("uk", "Ukrainian"), ("sv", "Swedish"),
     ]
 
-    /// Spoken-summary length. "full" folded into the richest tier (AGENTS.md), so the
-    /// picker offers three — the stray fourth entry the pop-over still listed is gone.
+    /// Spoken-summary length, shortest to longest. "Full" is a real tier again as of 2.0.0
+    /// (a spoken paragraph that explains rather than summarizes); it used to be a legacy
+    /// alias folded into "Rich".
     static let styleLevels: [(id: String, label: String)] = [
-        ("terse", "Terse"), ("normal", "Normal"), ("rich", "Rich"),
+        ("terse", "Terse"), ("normal", "Normal"), ("rich", "Rich"), ("full", "Full"),
     ]
 
     /// When replies are spoken; values match what `voice-context.sh` reads.
     /// Labels are self-describing so no explanatory caption is needed.
     static let responseModes: [(id: String, label: String)] = [
         ("voice", "Only when I dictate"), ("always", "On every turn"),
+        ("needed", "Only when I'm needed"),
     ]
 
     static let focusApps: [(id: String, label: String)] = [

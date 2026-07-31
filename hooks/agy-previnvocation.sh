@@ -39,6 +39,7 @@ IS_VOICE=$(match_and_claim_voice_turn "$PROMPT")
 SPEAK=0
 case "$MODE" in
   always) SPEAK=1 ;;
+  needed) SPEAK=1 ;;   # candidate on every turn; build_nudge makes the model gate it
   *)      [ "$IS_VOICE" -eq 1 ] && SPEAK=1 ;;
 esac
 [ "$SPEAK" -eq 1 ] || { echo '{}'; exit 0; }

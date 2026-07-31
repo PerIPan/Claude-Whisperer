@@ -80,6 +80,20 @@ func agyPreInvocationFailures() -> [String] {
         if msg?.contains("should be spoken aloud") != true { fail("alwaysMode: \(msg?.debugDescription ?? "nil")") }
     }
 
+    // 5a) needed mode → agy is a candidate on every turn too, and gets the same conditional
+    //     gate the other platforms get. Guards the `needed) SPEAK=1` branch in the hook.
+    do {
+        let s = newSandbox()
+        s.writeResponseMode("needed")
+        let transcript = s.writeAgyTranscript(["just a typed-style request"])
+        let r = Hook.run("agy-previnvocation.sh", stdin: input(invocationNum: 0, transcriptPath: transcript.path), sandbox: s)
+        let msg = ephemeralMessage(r.stdout)
+        if msg?.contains("ONLY if it needs something from me") != true {
+            fail("neededMode: missing conditional gate: \(msg?.debugDescription ?? "nil")")
+        }
+        if msg?.contains("do NOT call the tool at all") != true { fail("neededMode: missing silence branch") }
+    }
+
     // 6) style/voice/persona pass-through: proves voice-shared.sh wiring, not just the base nudge.
     do {
         let s = newSandbox()

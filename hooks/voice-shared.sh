@@ -11,6 +11,11 @@ VOICE_TURN="$APP_SUPPORT/voice_turn"
 FRESHNESS=900
 
 # Response mode. Precedence: per-project OW_TTS_RESPONSE env → global file → "voice".
+#   voice  (default) — speak only voice-dictated turns
+#   always           — speak every turn
+#   needed           — every turn is a candidate, but the model speaks only when the turn
+#                      ends on the user (question / blocked / approval / failure). The gate
+#                      lives in the nudge because this hook cannot see the turn's outcome.
 resolve_mode() {
   local mode="$OW_TTS_RESPONSE"
   [ -z "$mode" ] && mode=$(cat "$APP_SUPPORT/tts_response_mode" 2>/dev/null | tr -d '[:space:]')
@@ -61,10 +66,28 @@ resolve_length_phrase() {
   [ -z "$style" ] && style=$(cat "$APP_SUPPORT/tts_style" 2>/dev/null | tr -d '[:space:]')
   [ -z "$style" ] && style=$(cat "$APP_SUPPORT/voice_detail" 2>/dev/null | tr -d '[:space:]')
   case "$style" in
-    terse)     echo "one short, plain spoken sentence" ;;
-    rich|full) echo "a sentence or two of plain spoken summary" ;;
-    *)         echo "one plain spoken sentence" ;;
+    terse) echo "one short, plain spoken sentence" ;;
+    rich)  echo "a sentence or two of plain spoken summary" ;;
+    # `full` used to fold into `rich`; since 2.0.0 it is its own, longest tier. Anyone
+    # carrying the legacy value asked for maximum detail, so promoting them is a
+    # restoration of that intent rather than a surprise.
+    full)  echo "a spoken paragraph of four or five sentences" ;;
+    *)     echo "one plain spoken sentence" ;;
   esac
+}
+
+# Depth nudge for the longest tier only. The base sentence asks for something that
+# "summarizes your answer", which on its own would cap `full` at a longer summary —
+# this tells the model to actually explain. Empty for every other tier.
+resolve_depth_line() {
+  local style="$OW_TTS_STYLE"
+  [ -z "$style" ] && style=$(cat "$APP_SUPPORT/tts_style" 2>/dev/null | tr -d '[:space:]')
+  [ -z "$style" ] && style=$(cat "$APP_SUPPORT/voice_detail" 2>/dev/null | tr -d '[:space:]')
+  if [ "$style" = "full" ]; then
+    echo " Use that paragraph to explain your reasoning and any trade-offs, not just the conclusion — but keep it spoken prose, with no lists, headings, code, or file paths."
+  else
+    echo ""
+  fi
 }
 
 # Native-tongue flavor: for a personified voice, an ungated persona keyed off the voice id's
@@ -144,22 +167,44 @@ resolve_speak_args() {
   if [ -n "$OW_TTS_SPEED" ] && printf '%s' "$OW_TTS_SPEED" | grep -Eq '^[0-9]+(\.[0-9]+)?$'; then
     ovr="${ovr} speed=$OW_TTS_SPEED"
   fi
-  echo " Call it with${ovr}."
+  # Conditional wording in "needed" mode: an unconditional "Call it with…" directly after
+  # "do NOT call the tool at all" reads as a contradictory imperative.
+  if [ "$(resolve_mode)" = "needed" ]; then
+    echo " If you do speak, call it with${ovr}."
+  else
+    echo " Call it with${ovr}."
+  fi
 }
 
 # Build the full nudge sentence. $1 = IS_VOICE (0/1).
 build_nudge() {
   local is_voice="$1"
-  local len flavor speak_args lang_line prefix
+  local mode len flavor speak_args lang_line depth_line prefix core
+  mode=$(resolve_mode)
   len=$(resolve_length_phrase)
   flavor=$(resolve_flavor)
   speak_args=$(resolve_speak_args)
   lang_line=$(resolve_language_line)
-  if [ "$is_voice" -eq 1 ]; then
-    prefix="This turn was dictated by voice."
+  depth_line=$(resolve_depth_line)
+
+  if [ "$mode" = "needed" ]; then
+    # "Only when I'm needed" cannot be decided here: this hook runs at prompt-submit,
+    # before the turn exists, and there is deliberately no Stop hook. So the gate is
+    # delegated to the model, which knows while composing whether the turn ends on the
+    # user. Same accepted trade as the rest of the handshake — no fallback either way.
+    prefix="Speak this reply ONLY if it needs something from me."
+    core=$(printf 'First decide whether this turn ends on me: you are asking a question, you are blocked, you need my approval for something risky or destructive, or something failed and I have to choose what happens next. If so, your FIRST action must be to call the `speak` tool exactly once, passing %s that says plainly what you need from me and stands alone when heard.%s If instead the work simply succeeded and needs nothing from me, do NOT call the tool at all — staying silent is the correct outcome, and a spoken "all done" is exactly what this mode exists to avoid.' \
+      "$len" "$depth_line")
   else
-    prefix="This reply should be spoken aloud."
+    if [ "$is_voice" -eq 1 ]; then
+      prefix="This turn was dictated by voice."
+    else
+      prefix="This reply should be spoken aloud."
+    fi
+    core=$(printf 'Before writing your on-screen reply, your FIRST action must be to call the `speak` tool exactly once, passing %s that summarizes your answer and stands alone when heard.%s Do not skip the speak call.' \
+      "$len" "$depth_line")
   fi
-  printf '%s Before writing your on-screen reply, your FIRST action must be to call the `speak` tool exactly once, passing %s that summarizes your answer and stands alone when heard.%s Then write your full reply on screen as usual. Do not skip the speak call, and do not mention the tool in your written reply.%s%s' \
-    "$prefix" "$len" "$speak_args" "$flavor" "$lang_line"
+
+  printf '%s %s%s Then write your full reply on screen as usual. Do not mention the tool in your written reply.%s%s' \
+    "$prefix" "$core" "$speak_args" "$flavor" "$lang_line"
 }

@@ -33,33 +33,8 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 - **A second engine, picked by measurement** — **Supertonic-3** runs alongside Kokoro (both already inside the app's speech library, so there's no new binary to trust). It's ~10× faster than the existing English voices on the Neural Engine, so spoken replies start sooner.
 - **Your reply is written in the voice's language** — picking a Dutch voice isn't enough on its own, since a Dutch voice reading English text helps nobody. Your agent is now told to write the spoken summary in that language; your on-screen reply is untouched.
 - **Nothing changes if you're on English** — the multilingual model (~264 MB) downloads only when you actually pick one of these voices, and every existing voice setting keeps working.
+- **A "Full" length and an "Only when I'm needed" mode** — Full speaks a paragraph that explains the reasoning rather than just summarizing. "Only when I'm needed" stays silent while work succeeds and speaks up only when the turn ends on you: a question, a blocked step, an approval, or a failure — so you can walk away from a long run and be told when you're wanted.
 - **Smaller Settings window**, a **Recording** entry in the menubar (placeholder for now), and a quieter overlay and Agents tab.
-
-### 1.11.0
-
-- **Back to WhisperKit for dictation** — the speech-to-text engine returns to **WhisperKit** (large-v3 turbo), reversing 1.10.0's switch to Parakeet. You get Whisper's stronger noise robustness, ~99 languages, and cleaner punctuation/casing; the trade is a slower first load and slower decode. Your custom vocabulary now works at **both** layers — it biases the model as it listens *and* corrects the finished transcript.
-- **A real Settings window** — settings move out of the menubar popover into a proper five-tab window: **Dictation · Voice · Agents · Advanced**, with **General** on the right as the app logo. It keeps the warm cream/gold identity throughout — the tab bar is drawn by the app, so there's no gray system strip. The menubar is now a small dropdown (Settings · Show Overlay · Quit).
-- **Connect several agents at once** — the Agents tab lists **all four** agents (Claude Code, Codex CLI, Pi, Antigravity) with their own status and **Connect** button, instead of a single-select picker that implied you could only use one. Each row has an ⓘ explaining exactly which files get written, and the manual follow-up step (Pi's `/reload`, Codex's one-time hook trust, agy's new session) stays on screen instead of hiding in a tooltip.
-- **Permissions you can actually act on** — a missing grant is now the loudest thing on the tab (it used to render in the faintest color in the palette), rows are real buttons that open System Settings, and the logo tab carries a badge whenever something needs attention.
-- **Branded controls throughout** — custom sliders and text fields replace the last system-drawn widgets, card headers use the Fraunces brand serif, and the speed/volume sliders now save once when you release instead of on every step.
-- **Clearer wording** — "Auto-Apply" → **Connect**, "with return" → "Return to the previous app afterwards", "auto-submit" → "Press Return after inserting text", "Detail" → **Length**, and the reply modes now read "Only when I dictate" / "On every turn".
-
-### 1.10.1
-
-- **Branded popover is back** — the native tabbed Settings window from 1.10.0 is replaced by the warm cream/gold menubar popover (the app's original identity). Everything else from 1.10.0 stays: Parakeet STT, the overlay + analyzer styles, custom vocabulary.
-- **Wave overlay is back (default)** — the beloved 1.6.0 look (a frosted waveform + status dot) returns as the **Wave** style and is the default again. The 1.10 analyzers stay as options.
-- **One overlay control** — the overlay toggle and analyzer-style picker are merged into a single **Transcription Overlay** dropdown: OFF · Wave · LED Bars · Graph · Curtain.
-- **Idle STANDBY readout** — the overlay shows a `STANDBY` marquee when idle instead of a blank panel.
-- **Permissions moved** — Accessibility / Microphone now live inside the **Server & Logs** card, which auto-expands when a grant is missing.
-- **Fix** — the STT status row correctly reads **Parakeet STT** (it was mislabeled "Whisper STT").
-
-### 1.10.0
-
-- **New speech engine — Parakeet TDT v3** — dictation moved from WhisperKit to NVIDIA's **Parakeet TDT v3** (CoreML / Apple Neural Engine). On-device it decodes several times faster with comparable quiet-room accuracy, and the engine pre-warms so your first dictation isn't slow. WhisperKit has been removed.
-- **Native Settings window** — the old menubar popover is replaced by a proper tabbed macOS Settings window: **General** (login item, permissions), **Input** (dictation, language, app focus), **Voice** (voice, speed, volume, response), **Agents** (platform picker + one-click apply), and **Advanced** (models, server, diagnostics). The menubar is now a clean dropdown.
-- **Reworked overlay** — the floating overlay is resizable, pauses when idle, and offers selectable analyzer styles (LED bars, graph, curtain, spectrum) picked in Settings. Real mic levels drive the spectrum and real playback levels drive the speaking wave, on a frosted faceplate with a breathing status lamp.
-- **Transcription history** — recent dictations now appear right in the menubar dropdown, backed by a session store.
-- **Custom vocabulary** — add a glossary of your own terms in Settings; a fuzzy corrector post-fixes transcripts against it (handy for names, jargon, and product names the model mishears).
 
 <details>
 <summary><strong>Earlier releases — 1.6.x, 1.5.x</strong> (Antigravity & Pi, voice personas, native rewrite, streaming TTS)</summary>
@@ -129,8 +104,8 @@ Everything else lives in the **Settings** window (⌘,), across five tabs:
 **Voice**
 - **Voice** — the full Kokoro-82M roster (~54 voices, grouped by language), plus **Dutch, German, Polish, Russian and Ukrainian** voices that Kokoro can't speak; non-default voices download on demand
 - **Speed** (0.7×–1.5×, default 1.1×) and **Volume**
-- **Length** — how much is spoken: Terse, Normal (default), or Rich
-- **Speak** — Only when I dictate (default), or On every turn
+- **Length** — how much is spoken: Terse, Normal (default), Rich, or **Full** (a spoken paragraph that explains the reasoning, not just the outcome)
+- **Speak** — Only when I dictate (default), On every turn, or **Only when I'm needed** (silent unless the turn ends on you)
 
 **Agents** — all four agents (Claude Code, Codex CLI, Pi, Antigravity) with their own status and **Connect** button; connect as many as you use. Each has an ⓘ explaining exactly which files get written.
 
@@ -205,7 +180,7 @@ There's no special tag to add — voice mode works automatically. The app and it
 - **Screen**: you see the full detailed response
 - **Speakers**: you hear the spoken opening summary
 
-This "dictated turns only" behavior is the default. The **Response** control in Voice Settings changes *when* replies are spoken: **when Voice** (dictated turns only — the default) or **Always** (every turn). Per-project override via `OW_TTS_RESPONSE`.
+This "dictated turns only" behavior is the default. The **Response** control in Voice Settings changes *when* replies are spoken: **Only when I dictate** (the default), **On every turn**, or **Only when I'm needed** — which treats every turn as a candidate but speaks only when the turn ends on you (a question, a blocked step, an approval, or a failure), staying silent when work simply succeeded. Per-project override via `OW_TTS_RESPONSE`.
 
 ### Voice Style Levels
 
@@ -216,6 +191,7 @@ Choose how verbose that opening summary should be (set in **Settings → Voice �
 | **Terse** | One short sentence — just the key outcome |
 | **Normal** | One plain sentence (default) |
 | **Rich** | A sentence or two of summary (code/paths/tables described, not read literally) |
+| **Full** | A spoken paragraph of four or five sentences that explains the reasoning and any trade-offs — still spoken prose, never lists or code |
 
 ## Configuration
 
@@ -229,7 +205,7 @@ Most settings are configured in the Settings window (voice, volume, language, ho
 | `TTS_VOLUME` | `1` | `speak.sh` | Playback volume (the in-app player uses the menubar volume setting instead) |
 | `OW_TTS_STYLE` | menubar **Style** | hooks | Per-project spoken-summary style (`terse`/`normal`/`rich`/`full`); overrides the global `tts_style` |
 | `OW_TTS_VOICE` | menubar voice | hooks | Per-project voice id, Kokoro or `supertonic:<lang>:<style>` (any of its 31 languages, not just the five in the picker); overrides the global `tts_voice` |
-| `OW_TTS_RESPONSE` | menubar **Response** | hooks | Per-project response mode (`voice`/`always`); overrides the global `tts_response_mode` |
+| `OW_TTS_RESPONSE` | menubar **Response** | hooks | Per-project response mode (`voice`/`always`/`needed`); overrides the global `tts_response_mode` |
 
 > **Tip:** Setting a specific language (e.g. English) instead of auto-detect prevents the model from hallucinating text in other languages during silence or background noise.
 
@@ -333,7 +309,7 @@ Contributions are welcome! Feel free to open issues or submit pull requests. Whe
 
 ## Acknowledgments
 
-The native rewrite at the heart of this app — replacing the out-of-process Python server with fully in-process Swift speech-to-text and text-to-speech (FluidAudio Kokoro), in-process streaming playback and barge-in, and the tagless voice-turn handshake — was contributed by [**Hakan Ensari**](https://github.com/hakanensari) ([fork](https://github.com/hakanensari/OpenWhisperer)). It removed the Python/venv stack entirely and made the app notarizable. Thank you! (1.10.0 briefly replaced WhisperKit with Parakeet; 1.11.0 restored WhisperKit.)
+The native rewrite at the heart of this app — replacing the out-of-process Python server with fully in-process Swift speech-to-text and text-to-speech (FluidAudio), in-process streaming playback and barge-in, and the tagless voice-turn handshake — was contributed by [**Hakan Ensari**](https://github.com/hakanensari) ([fork](https://github.com/hakanensari/OpenWhisperer)). It removed the Python/venv stack entirely and made the app notarizable. Thank you!
 
 ## Credits
 

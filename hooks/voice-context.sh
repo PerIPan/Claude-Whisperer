@@ -5,6 +5,8 @@
 # Response mode (tts_response_mode, or per-project OW_TTS_RESPONSE):
 #   voice  (default) — speak only voice-dictated turns (prompt hash matches voice_turn)
 #   always           — speak every turn
+#   needed           — every turn is a candidate, but the nudge tells the model to speak only
+#                      when the turn ends on the user (question / blocked / approval / failure)
 # There is no Stop hook and no speak_pending marker: the model's own `speak` call is the audio.
 # Both platforms pass {prompt, session_id, hook_event_name:"UserPromptSubmit"} and accept the
 # {hookSpecificOutput:{additionalContext}} output, so one script serves both.
@@ -38,6 +40,7 @@ IS_VOICE=$(match_and_claim_voice_turn "$PROMPT")
 SPEAK=0
 case "$MODE" in
   always) SPEAK=1 ;;
+  needed) SPEAK=1 ;;   # candidate on every turn; build_nudge makes the model gate it
   *)      [ "$IS_VOICE" -eq 1 ] && SPEAK=1 ;;   # voice (default); a stale "text" falls here
 esac
 [ "$SPEAK" -eq 1 ] || exit 0

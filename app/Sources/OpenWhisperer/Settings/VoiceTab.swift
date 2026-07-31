@@ -66,7 +66,19 @@ struct VoiceTab: View {
             OWCard {
                 VStack(alignment: .leading, spacing: 10) {
                     OWCardHeader(title: "Response", icon: "text.bubble",
-                                 help: "How much of a reply is spoken, and on which turns.")
+                                 help: """
+                                 How much of a reply is spoken, and on which turns.
+
+                                 Length — Terse: one short sentence. Normal: one sentence. \
+                                 Rich: a sentence or two. Full: a spoken paragraph that \
+                                 explains the reasoning, not just the outcome.
+
+                                 Speak — Only when I dictate: typed turns stay silent. \
+                                 On every turn: every reply is spoken. Only when I'm needed: \
+                                 speaks only when the turn ends on you — a question, a blocked \
+                                 step, an approval, or a failure — and stays silent when work \
+                                 simply succeeded.
+                                 """)
 
                     OWPickerRow(label: "Length", labelWidth: 62) {
                         OWMenuPicker(selection: $selectedStyle, options: SettingsData.styleLevels)
@@ -100,10 +112,9 @@ struct VoiceTab: View {
         }
         if let savedStyle = try? String(contentsOf: Paths.ttsStyle, encoding: .utf8) {
             let style = savedStyle.trimmingCharacters(in: .whitespacesAndNewlines)
-            // "full" folded into the richest tier — map legacy values onto it.
-            if style == "full" {
-                selectedStyle = "rich"
-            } else if SettingsData.styleLevels.contains(where: { $0.id == style }) {
+            // "full" is a real tier again (2.0.0), so it no longer maps onto "rich" —
+            // a stored legacy value now selects the tier it always named.
+            if SettingsData.styleLevels.contains(where: { $0.id == style }) {
                 selectedStyle = style
             }
         }
