@@ -69,10 +69,7 @@ func sttLanguageFailures() -> [String] {
     check("common has no duplicates",
           Set(STTLanguages.common).count == STTLanguages.common.count)
 
-    // Search semantics live in `PickerSearchChecks` — the picker and `match` share one
-    // predicate, so testing it twice here would only duplicate that file.
-    check("no match returns empty",
-          STTLanguages.match(all, query: "zzzz").isEmpty)
+    // Search semantics live in `PickerSearchChecks`, against the predicate the picker runs.
 
     // Default-language migration
     check("nothing stored defaults to English",

@@ -59,22 +59,27 @@ enum SettingsData {
 
     // MARK: - Dictate (STT)
 
-    /// Every language WhisperKit accepts, intersected with what the linked build actually
-    /// knows so the picker can never offer a code the decoder would reject. The table is
-    /// hand-maintained (`STTLanguages`) because WhisperKit's own map is a dictionary with
-    /// no stable order and carries alias names.
-    static let languages: [(id: String, label: String)] = {
+    /// The roster (`STTLanguages`) intersected with what the linked WhisperKit build actually
+    /// knows, so the picker can never offer a code the decoder would reject and the About
+    /// panel can never claim more languages than are on offer.
+    ///
+    /// The table is hand-maintained because WhisperKit's own map is a dictionary — no stable
+    /// order — and carries alias names (`castilian`/`spanish`). This intersection is the guard
+    /// against that table drifting from a future pin bump; it can only ever shrink the list.
+    static let supportedLanguages: [STTLanguage] = {
         let supported = Constants.languageCodes
-        return [(STTLanguages.autoCode, "Auto-detect")]
-            + STTLanguages.all.filter { supported.contains($0.code) }.map { ($0.code, $0.name) }
+        return STTLanguages.all.filter { supported.contains($0.code) }
     }()
+
+    /// What Settings offers, Auto-detect included.
+    static let languages: [(id: String, label: String)] =
+        [(STTLanguages.autoCode, "Auto-detect")] + supportedLanguages.map { ($0.code, $0.name) }
 
     /// Dictate picker sections. Auto-detect is pinned first, then the shortlist, then the
     /// full roster split by measured quality. Nothing is hidden — the tiers only say how
     /// much to expect, which is a judgement the app can't make for the user.
     static var languageSections: [OWPickerSection] {
-        let supported = Constants.languageCodes
-        let available = STTLanguages.all.filter { supported.contains($0.code) }
+        let available = supportedLanguages
 
         func options(_ langs: [STTLanguage], badged: Bool) -> [OWPickerOption] {
             langs.map { lang in

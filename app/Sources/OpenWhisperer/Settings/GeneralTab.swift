@@ -179,7 +179,7 @@ struct GeneralTab: View {
                 // were widened, and shipped wrong.
                 engineRow(icon: "waveform",
                           title: "Speech to text",
-                          detail: "WhisperKit large-v3 turbo — on the Apple Neural Engine, \(STTLanguages.all.count) languages")
+                          detail: "WhisperKit large-v3 turbo — on the Apple Neural Engine, \(SettingsData.supportedLanguages.count) languages")
                 engineRow(icon: "speaker.wave.2",
                           title: "Text to speech",
                           detail: "Kokoro-82M and Supertonic-3 — \(TTSVoiceRegistry.allVoices.count) voices across \(TTSVoiceRegistry.languageCount) languages, on the Neural Engine")

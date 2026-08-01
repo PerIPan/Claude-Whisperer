@@ -3,9 +3,10 @@ import Foundation
 /// The find-as-you-type predicate behind `OWSearchablePicker`.
 ///
 /// Pure and in Kit so the search the UI actually runs is the search that is unit-tested.
-/// An earlier cut had the rule written twice — once here for `STTLanguages.match`, once
-/// inline in the picker — which meant the tested version and the shipped version were
-/// different code. Both reviewers caught it; there is now one definition.
+/// An earlier cut had the rule written twice — once in a `STTLanguages.match` convenience
+/// no caller reached, once inline in the picker — so the tested version and the shipped
+/// version were different code. Both reviewers caught it; this is now the one definition,
+/// and the unreachable convenience is gone.
 public enum PickerSearch {
     /// Whether a query should filter at all. A blank query is not a filter.
     public static func isActive(_ query: String) -> Bool {

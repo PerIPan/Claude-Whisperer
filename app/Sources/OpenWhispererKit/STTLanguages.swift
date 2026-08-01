@@ -190,15 +190,9 @@ public enum STTLanguages {
         all.filter { $0.tier == tier }
     }
 
-    /// Case-insensitive find-as-you-type over the roster, via the same predicate the
-    /// Settings picker runs (`PickerSearch`), so this cannot drift from what ships.
-    /// An empty query returns `langs` unchanged.
-    public static func match(_ langs: [STTLanguage], query: String) -> [STTLanguage] {
-        guard PickerSearch.isActive(query) else { return langs }
-        return langs.filter {
-            PickerSearch.matches(query: query, label: $0.name, keywords: [$0.code])
-        }
-    }
+    // Roster search lives in `PickerSearch`, which `OWSearchablePicker` calls directly on its
+    // own row type. A `match(_:query:)` convenience here had no production caller — review
+    // flagged it as tested code no user could reach — so it is gone rather than left dead.
 
     /// What to store for `stt_language` given what is already there; nil means leave it be.
     ///

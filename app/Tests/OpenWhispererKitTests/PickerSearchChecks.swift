@@ -45,15 +45,17 @@ func pickerSearchFailures() -> [String] {
     check("keyword match ignores case",
           PickerSearch.matches(query: "EL", label: "Greek", keywords: ["el"]))
 
-    // STTLanguages.match must route through the same predicate, so the roster search and
-    // the picker search cannot diverge.
-    let all = STTLanguages.all
-    check("match finds Greek by name", STTLanguages.match(all, query: "gree").contains { $0.code == "el" })
-    check("match finds Greek by code", STTLanguages.match(all, query: "el").contains { $0.code == "el" })
-    check("match is prefix-only on code",
-          !STTLanguages.match(all, query: "ue").contains { $0.code == "yue" })
-    check("match passes an empty query through",
-          STTLanguages.match(all, query: "").count == all.count)
+    // Exercised the way the picker actually calls it: one row per language, the display name
+    // as the label and the ISO code as the sole keyword.
+    let rows = STTLanguages.all.map { (label: $0.name, keywords: [$0.code], code: $0.code) }
+    func hits(_ q: String) -> [String] {
+        rows.filter { PickerSearch.matches(query: q, label: $0.label, keywords: $0.keywords) }
+            .map(\.code)
+    }
+    check("roster search finds Greek by name", hits("gree").contains("el"))
+    check("roster search finds Greek by code", hits("el").contains("el"))
+    check("roster search is prefix-only on code", !hits("ue").contains("yue"))
+    check("an unmatched query finds nothing", hits("zzzz").isEmpty)
 
     return failures
 }
