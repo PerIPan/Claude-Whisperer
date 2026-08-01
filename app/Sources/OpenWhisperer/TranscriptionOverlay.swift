@@ -20,16 +20,57 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
     /// The faceplate tint layer, kept so a theme change can repaint it. `.cgColor` resolves a
     /// dynamic NSColor immediately, so it cannot update itself.
     private var tintView: NSView?
+    private var effectView: NSVisualEffectView?
 
-    /// Faceplate colour for the active theme, translucent over the HUD blur.
-    private static func faceplateColor() -> NSColor {
-        let palettes = ThemeManager.activePalettes
-        return NSColor.ow(palettes.light.page, palettes.dark.page).withAlphaComponent(0.75)
+    /// The page colour the faceplate should take. Cream keeps its historic smoked-dark
+    /// instrument face in both appearances; every other theme shows its own page colour.
+    private static func faceplatePage() -> (color: NSColor, isLight: Bool) {
+        let theme = ThemeManager.shared.theme
+        if theme == .cream {
+            let dark = OWTheme.creamDarkPage
+            return (NSColor.ow(dark, dark), false)
+        }
+        let page = theme.palettes.light.page
+        return (NSColor.ow(page, page), luminance(page) > 0.55)
     }
 
-    /// Repaint the faceplate after the user picks a different theme.
+    /// Faceplate colour for the active theme.
+    ///
+    /// A light page needs to sit almost opaquely: `.hudWindow` is a dark material in both
+    /// appearances, so at the original 0.75 the blur dominated and every light theme came out
+    /// the same muddy grey rather than its own colour.
+    private static func faceplateColor() -> NSColor {
+        let page = faceplatePage()
+        return page.color.withAlphaComponent(page.isLight ? 0.94 : 0.75)
+    }
+
+    /// Dark themes keep the HUD material; light ones would be dragged grey by it.
+    private static func faceplateMaterial() -> NSVisualEffectView.Material {
+        faceplatePage().isLight ? .windowBackground : .hudWindow
+    }
+
+    /// Relative luminance of a 0xRRGGBB colour, 0…1.
+    private static func luminance(_ hex: UInt32) -> Double {
+        func channel(_ raw: UInt32) -> Double {
+            let c = Double(raw) / 255.0
+            return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channel((hex >> 16) & 0xFF)
+            + 0.7152 * channel((hex >> 8) & 0xFF)
+            + 0.0722 * channel(hex & 0xFF)
+    }
+
+    /// Repaint the overlay after the user picks a different theme.
+    ///
+    /// Two separate things need poking: the faceplate is a `CALayer` colour, which nothing
+    /// re-evaluates on its own, and the SwiftUI content above it (waveform gradients, status
+    /// text, the wave-style background) only re-reads `OWColor` when something it observes
+    /// changes — so publish as well, or the bars keep their old palette until the next redraw.
     func refreshTheme() {
         tintView?.layer?.backgroundColor = Self.faceplateColor().cgColor
+        effectView?.material = Self.faceplateMaterial()
+        window?.appearance = ThemeManager.shared.windowAppearance
+        objectWillChange.send()
     }
 
     @Published var isVisible: Bool = false
@@ -201,7 +242,8 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
         // Shaped via maskImage — mutating the effect view's own layer
         // (cornerRadius/masksToBounds) silently breaks the behind-window blur.
         let effect = NSVisualEffectView()
-        effect.material = .hudWindow
+        effect.material = Self.faceplateMaterial()
+        effectView = effect
         effect.blendingMode = .behindWindow
         effect.state = .active
         effect.maskImage = Self.faceplateMask()

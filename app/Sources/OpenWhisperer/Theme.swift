@@ -132,6 +132,8 @@ struct OWWindowBackground: NSViewRepresentable {
         guard let window else { return }
         let palettes = ThemeManager.activePalettes
         window.backgroundColor = .ow(palettes.light.page, palettes.dark.page)
+        // Also on creation, so a window opened *after* the theme was chosen matches it.
+        window.appearance = ThemeManager.shared.windowAppearance
     }
 }
 

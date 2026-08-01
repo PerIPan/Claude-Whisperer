@@ -7,6 +7,10 @@ struct SettingsView: View {
     @EnvironmentObject var setupManager: SetupManager
     @EnvironmentObject var dictationManager: DictationManager
     @EnvironmentObject var accessibilityManager: AccessibilityManager
+    /// Observed so a theme change re-renders the whole window. Without this only the tab
+    /// that owns the picker repainted, and the rest kept its old colours until you
+    /// switched tabs and forced a rebuild.
+    @ObservedObject private var themeManager = ThemeManager.shared
 
     /// Fixed content size (the window is not user-resizable). The height is explicit
     /// rather than derived from each tab: sizing to content clipped the tallest tab

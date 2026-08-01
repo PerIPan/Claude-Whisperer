@@ -36,25 +36,39 @@ final class ThemeManager: ObservableObject {
         isInitialised = true
     }
 
-    /// Push the palette into the static `OWColor` reads, and tell AppKit which appearance the
-    /// app's own windows should use. Without the appearance override a fixed dark theme would
-    /// still draw system chrome (titlebar, menus, focus rings) in light mode, and vice versa.
+    /// The AppKit appearance a theme's own windows should draw with, or `nil` to follow the
+    /// system. A fixed theme needs this so its titlebar, focus rings and scrollbars match the
+    /// palette rather than whatever macOS is set to.
+    var windowAppearance: NSAppearance? {
+        switch theme {
+        case .cream: return nil                                 // follow the system, as always
+        case .dark: return NSAppearance(named: .darkAqua)
+        default: return NSAppearance(named: .aqua)
+        }
+    }
+
+    /// Push the palette into the static `OWColor` reads and restyle the windows we own.
+    ///
+    /// Deliberately **not** `NSApp.appearance`. Setting that styles every window the process
+    /// has, including the menubar status item — which must keep following the system menu bar.
+    /// Forcing it light against a dark menu bar drew a white block behind the icon.
     private func apply() {
         Self.activePalettes = theme.palettes
-        switch theme {
-        case .cream:
-            NSApp?.appearance = nil                 // follow the system, as the app always has
-        case .dark:
-            NSApp?.appearance = NSAppearance(named: .darkAqua)
-        default:
-            NSApp?.appearance = NSAppearance(named: .aqua)
-        }
-        // Windows cache their background colour, so repaint the ones we own.
-        for window in NSApp?.windows ?? [] {
-            window.backgroundColor = .ow(theme.palettes.light.page, theme.palettes.dark.page)
+        let background = NSColor.ow(theme.palettes.light.page, theme.palettes.dark.page)
+        for window in NSApp?.windows ?? [] where Self.isOwnWindow(window) {
+            window.appearance = windowAppearance
+            window.backgroundColor = background
         }
         // The overlay's faceplate is a CALayer colour, which SwiftUI never re-evaluates.
         if isInitialised { TranscriptionOverlay.shared.refreshTheme() }
+    }
+
+    /// Whether a window is one of ours to restyle. Excludes the status-item window and the
+    /// menubar popover, which belong to the menu bar's appearance, not the app's theme.
+    private static func isOwnWindow(_ window: NSWindow) -> Bool {
+        let name = String(describing: type(of: window))
+        return !name.contains("StatusBar") && !name.contains("MenuBarExtra")
+            && !name.contains("NSPopover") && !name.contains("Popover")
     }
 
     private func persist() {

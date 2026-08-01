@@ -22,8 +22,8 @@ func owThemeFailures() -> [String] {
             failures.append("OWTheme.parse(\(raw ?? "nil")) should fall back to the default")
         }
     }
-    if OWTheme.default != .cream {
-        failures.append("OWTheme.default must stay .cream — it is the app's own identity")
+    if OWTheme.default != .champagne {
+        failures.append("OWTheme.default should be .champagne (the brand palette) as of 2.0.1")
     }
 
     // Cream is the only theme that tracks the system appearance; every other theme must hold

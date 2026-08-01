@@ -46,8 +46,9 @@ public struct OWPalette: Sendable, Equatable {
 
 /// The app's selectable appearances.
 ///
-/// **Cream** is the original Open Whisperer identity and the default; it is the only theme that
-/// follows the system's light/dark appearance, because that is how the app has always behaved.
+/// **Champagne** is the default. **Cream** is the original Open Whisperer identity and remains
+/// the only theme that follows the system's light/dark appearance, because that is how the app
+/// behaved before themes existed.
 /// The other five are ports of the Authé design system's palettes (`apps/authe-app/app/globals.css`
 /// — `:root`, `.dark`, `.pastel`, `.champ`, `.sky-champ`), whose OKLCH values were converted to
 /// sRGB. A fixed theme deliberately does *not* follow the system appearance: picking "Dark" means
@@ -60,7 +61,10 @@ public enum OWTheme: String, CaseIterable, Sendable, Equatable {
     case champagne
     case sky
 
-    public static let `default`: OWTheme = .cream
+    /// Champagne is the shipped default as of 2.0.1 — the brand's own palette. Note this is
+    /// what an install with no stored preference gets, so upgrading users move off Cream unless
+    /// they had already chosen a theme.
+    public static let `default`: OWTheme = .champagne
 
     public var label: String {
         switch self {
@@ -120,6 +124,10 @@ public enum OWTheme: String, CaseIterable, Sendable, Equatable {
     /// True when this theme's surfaces are dark, so AppKit chrome (window appearance, the
     /// overlay's vibrancy material) can be told which way round to render.
     public var prefersDarkChrome: Bool { self == .dark }
+
+    /// Cream's dark page, exposed so the overlay can keep its historic smoked faceplate for
+    /// that theme specifically without reaching into the palette table.
+    public static let creamDarkPage: UInt32 = 0x1E1B16
 
     // MARK: - Palettes
 
