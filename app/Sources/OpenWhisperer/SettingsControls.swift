@@ -473,6 +473,7 @@ struct OWAppPicker: View {
 
     @State private var showPopover = false
     @State private var query = ""
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         Button {
@@ -506,6 +507,7 @@ struct OWAppPicker: View {
                 TextField("Search apps…", text: $query)
                     .textFieldStyle(.roundedBorder)
                     .font(OWFont.body(11))
+                    .focused($searchFocused)
 
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 1) {
@@ -530,6 +532,8 @@ struct OWAppPicker: View {
             }
             .padding(8)
             .background(OWColor.page)
+            // Every installed app is in this list, so it is unusable without typing.
+            .onAppear { searchFocused = true }
         }
         // Picking a row clears `query`, but dismissing by click-outside or Escape does not,
         // so reopening would show a stale filtered list with no hint why. Same fix as
