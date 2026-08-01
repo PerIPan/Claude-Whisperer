@@ -190,15 +190,14 @@ public enum STTLanguages {
         all.filter { $0.tier == tier }
     }
 
-    /// Case-insensitive find-as-you-type: substring on the display name, prefix on the code.
-    ///
-    /// Code matching is prefix-only on purpose — a substring match would make the two-letter
-    /// query "el" hit every code containing those letters, burying Greek in noise.
+    /// Case-insensitive find-as-you-type over the roster, via the same predicate the
+    /// Settings picker runs (`PickerSearch`), so this cannot drift from what ships.
     /// An empty query returns `langs` unchanged.
     public static func match(_ langs: [STTLanguage], query: String) -> [STTLanguage] {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !q.isEmpty else { return langs }
-        return langs.filter { $0.name.lowercased().contains(q) || $0.code.hasPrefix(q) }
+        guard PickerSearch.isActive(query) else { return langs }
+        return langs.filter {
+            PickerSearch.matches(query: query, label: $0.name, keywords: [$0.code])
+        }
     }
 
     /// What to store for `stt_language` given what is already there; nil means leave it be.

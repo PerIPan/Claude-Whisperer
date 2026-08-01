@@ -25,16 +25,21 @@ public enum TTSSampleText {
         "e": "es", "p": "pt", "h": "hi", "j": "ja", "z": "zh",
     ]
 
-    /// Reviewed by a native or near-native speaker where possible; see the design spec's
-    /// review section. A wrong translation is audible, so treat corrections as bug fixes.
+    /// A wrong translation is audible, so treat corrections as bug fixes.
+    ///
+    /// **Every sample must be gender-neutral.** Each language ships both a female and a
+    /// male voice reading the same string, so a gendered first-person verb is wrong half
+    /// the time — and a preview is the one place that is maximally obvious. Where a
+    /// language marks gender on the verb (Hindi's future, the Slavic l-participle), the
+    /// second clause is phrased passively to avoid it.
     private static let samples: [String: String] = [
         "en": fallback,
         // Kokoro's nine
-        "fr": "Bonjour, voici à quoi je ressemble. Je lirai vos réponses à voix haute.",
-        "it": "Ciao, ecco come suono. Leggerò le tue risposte ad alta voce.",
-        "es": "Hola, así es como sueno. Leeré tus respuestas en voz alta.",
-        "pt": "Olá, é assim que eu soo. Vou ler suas respostas em voz alta.",
-        "hi": "नमस्ते, मेरी आवाज़ ऐसी है। मैं आपके जवाब ज़ोर से पढ़ूँगी।",
+        "fr": "Bonjour, voici à quoi ressemble ma voix. Je lirai tes réponses à voix haute.",
+        "it": "Ciao, questa è la mia voce. Leggerò le tue risposte ad alta voce.",
+        "es": "Hola, esta es mi voz. Leeré tus respuestas en voz alta.",
+        "pt": "Olá, esta é a minha voz. Vou ler suas respostas em voz alta.",
+        "hi": "नमस्ते, मेरी आवाज़ ऐसी है। आपके जवाब ज़ोर से पढ़े जाएँगे।",
         "ja": "こんにちは。これが私の声です。返信を読み上げます。",
         "zh": "你好，这就是我的声音。我会朗读你的回复。",
         // Supertonic's twenty-four
@@ -57,7 +62,7 @@ public enum TTSSampleText {
         "ro": "Salut, așa sun. Îți voi citi răspunsurile cu voce tare.",
         "ru": "Привет, вот как я звучу. Я буду читать ответы вслух.",
         "sk": "Ahoj, takto znejem. Budem ti čítať odpovede nahlas.",
-        "sl": "Živjo, tako zvenim. Tvoje odgovore bom brala na glas.",
+        "sl": "Živjo, tako zvenim. Tvoji odgovori bodo prebrani na glas.",
         "sv": "Hej, så här låter jag. Jag läser dina svar högt.",
         "tr": "Merhaba, sesim böyle. Yanıtlarını yüksek sesle okuyacağım.",
         "uk": "Привіт, ось як я звучу. Я читатиму відповіді вголос.",

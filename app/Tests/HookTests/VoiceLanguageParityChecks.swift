@@ -21,16 +21,26 @@ func voiceLanguageParityFailures() -> [String] {
         return ["voice-shared.sh could not be read at \(sharedPath.path)"]
     }
 
+    // Scope to resolve_language_line's body before parsing: an unrelated `xx) language="…"`
+    // elsewhere in the file would otherwise be absorbed into the map.
+    guard let bodyStart = shared.range(of: "resolve_language_line() {") else {
+        return ["voice-shared.sh: resolve_language_line() not found — did it get renamed?"]
+    }
+    let afterStart = shared[bodyStart.upperBound...]
+    let body = afterStart.range(of: "\n}").map { String(afterStart[..<$0.lowerBound]) }
+        ?? String(afterStart)
+
     // The map is a bash `case` of `code) language="Name" ;;` arms. Parsing the hook rather
     // than restating it keeps this a parity check instead of a second copy.
+    // `{2,3}` not `{2}`: a three-letter code like `yue` would otherwise register as `ue`
+    // and quietly compare against the wrong language.
     var hookNames: [String: String] = [:]
-    let pattern = #"([a-z]{2})\)\s*language="([^"]+)""#
-    let regex = try! NSRegularExpression(pattern: pattern)
-    let range = NSRange(shared.startIndex..., in: shared)
-    for match in regex.matches(in: shared, range: range) {
-        guard let codeRange = Range(match.range(at: 1), in: shared),
-              let nameRange = Range(match.range(at: 2), in: shared) else { continue }
-        hookNames[String(shared[codeRange])] = String(shared[nameRange])
+    let regex = try! NSRegularExpression(pattern: #"\b([a-z]{2,3})\)\s*language="([^"]+)""#)
+    let range = NSRange(body.startIndex..., in: body)
+    for match in regex.matches(in: body, range: range) {
+        guard let codeRange = Range(match.range(at: 1), in: body),
+              let nameRange = Range(match.range(at: 2), in: body) else { continue }
+        hookNames[String(body[codeRange])] = String(body[nameRange])
     }
 
     if hookNames.isEmpty {

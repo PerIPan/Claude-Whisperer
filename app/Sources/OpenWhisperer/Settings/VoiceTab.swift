@@ -4,6 +4,9 @@ import OpenWhispererKit
 /// Spoken replies (TTS output only): which voice, how fast/loud, how much, and when.
 struct VoiceTab: View {
     @EnvironmentObject var serverManager: ServerManager
+    /// Only for `ttsPlaying` — the same signal that drives the overlay waveform, so the
+    /// preview button reflects real playback instead of a guessed duration.
+    @EnvironmentObject var dictationManager: DictationManager
 
     @State private var selectedVoice = "af_heart"
     @State private var selectedSpeed: Double = Double(TTSSpeed.default)
@@ -13,7 +16,6 @@ struct VoiceTab: View {
     /// Held in state, not recomputed per redraw: each row's badge stats the filesystem,
     /// and `body` runs far more often than the cache changes.
     @State private var voiceSections: [OWPickerSection] = []
-    @State private var isPreviewing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -36,7 +38,7 @@ struct VoiceTab: View {
                             Button {
                                 preview()
                             } label: {
-                                Image(systemName: isPreviewing ? "speaker.wave.2.fill" : "play.fill")
+                                Image(systemName: dictationManager.ttsPlaying ? "speaker.wave.2.fill" : "play.fill")
                                     .font(.system(size: 9, weight: .bold))
                                     .foregroundColor(OWColor.accent)
                                     .frame(width: 22, height: 22)
@@ -152,16 +154,14 @@ struct VoiceTab: View {
     private func preview() {
         let voice = selectedVoice
         let speed = Float(selectedSpeed)
-        isPreviewing = true
-        serverManager.playback.bargeIn()
-        serverManager.playback.play(
-            text: TTSSampleText.sample(forVoiceID: voice), voice: voice, speed: speed)
-        // The controller is fire-and-forget, so this only un-highlights the button; the
-        // audio is unaffected either way.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-            isPreviewing = false
-            // A first preview may have just downloaded the pack.
-            voiceSections = SettingsData.voiceSections
+        // `TTSPlaybackController` is an actor precisely so the ANE work stays serialized —
+        // calling its methods synchronously from the main actor would run them on this
+        // thread alongside the actor's own in-flight synthesis task, racing the state it
+        // exists to protect. Hop onto the actor like every other call site does.
+        Task {
+            await serverManager.playback.bargeIn()
+            await serverManager.playback.play(
+                text: TTSSampleText.sample(forVoiceID: voice), voice: voice, speed: speed)
         }
     }
 

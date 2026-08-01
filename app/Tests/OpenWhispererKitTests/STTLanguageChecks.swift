@@ -69,21 +69,8 @@ func sttLanguageFailures() -> [String] {
     check("common has no duplicates",
           Set(STTLanguages.common).count == STTLanguages.common.count)
 
-    // Search
-    check("empty query returns the list unchanged",
-          STTLanguages.match(all, query: "").count == all.count)
-    check("whitespace query returns the list unchanged",
-          STTLanguages.match(all, query: "   ").count == all.count)
-    check("name substring finds Greek",
-          STTLanguages.match(all, query: "gree").contains { $0.code == "el" })
-    check("search is case-insensitive",
-          STTLanguages.match(all, query: "GREEK").contains { $0.code == "el" })
-    check("code prefix finds Greek",
-          STTLanguages.match(all, query: "el").contains { $0.code == "el" })
-    // Prefix-only code matching is the point: a substring rule would make "el" also match
-    // Welsh's name and every code containing "el", burying the exact hit.
-    check("code match is prefix-only, not substring",
-          !STTLanguages.match(all, query: "ue").contains { $0.code == "yue" })
+    // Search semantics live in `PickerSearchChecks` — the picker and `match` share one
+    // predicate, so testing it twice here would only duplicate that file.
     check("no match returns empty",
           STTLanguages.match(all, query: "zzzz").isEmpty)
 

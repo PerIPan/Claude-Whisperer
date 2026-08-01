@@ -30,6 +30,7 @@ struct KitTestRunner {
         failures += vocabularyPromptFailures()
         failures += disfluencyFilterFailures()
         failures += sttLanguageFailures()
+        failures += pickerSearchFailures()
         failures += ttsSampleTextFailures()
 
         if failures.isEmpty {

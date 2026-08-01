@@ -97,6 +97,7 @@ enum SettingsData {
             OWPickerSection(
                 id: "common", title: "Common",
                 caption: "The usual shortlist. All also appear under Good accuracy.",
+                isShortcut: true,
                 options: options(STTLanguages.common.compactMap { code in
                     available.first { $0.code == code }
                 }, badged: false)

@@ -272,6 +272,9 @@ struct OWPickerSection: Identifiable {
     /// One line explaining what the section means. This is the point of the control:
     /// a category should never have to be inferred from its name.
     var caption: String?
+    /// A convenience shortcut whose rows also appear in a full section below. Hidden while
+    /// searching so a match isn't listed twice.
+    var isShortcut: Bool = false
     let options: [OWPickerOption]
 }
 
@@ -295,6 +298,7 @@ struct OWSearchablePicker: View {
 
     @State private var showPopover = false
     @State private var query = ""
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         Button {
@@ -328,6 +332,7 @@ struct OWSearchablePicker: View {
                 TextField(placeholder, text: $query)
                     .textFieldStyle(.roundedBorder)
                     .font(OWFont.body(11))
+                    .focused($searchFocused)
 
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 1) {
@@ -365,25 +370,39 @@ struct OWSearchablePicker: View {
             }
             .padding(8)
             .background(OWColor.page)
+            // A 100-row list is unusable without typing, so land the caret in the field.
+            .onAppear { searchFocused = true }
+        }
+        // Selecting a row clears `query`, but dismissing by click-outside or Escape does
+        // not — without this, reopening shows a stale filtered list with its captions
+        // suppressed and no hint why.
+        .onChange(of: showPopover) { _, shown in
+            if !shown { query = "" }
         }
     }
 
-    private var isSearching: Bool {
-        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
+    private var isSearching: Bool { PickerSearch.isActive(query) }
 
     private var filteredSections: [OWPickerSection] {
         guard isSearching else { return sections }
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return sections.compactMap { section in
+        // Shortcut sections repeat rows that also live in a full section below (Dictate's
+        // "Common" duplicates 17 languages). Browsing wants both — the caption says so —
+        // but under a query the captions are hidden and the repeat just looks like the
+        // same language listed twice, so shortcuts drop out of results.
+        var seen = Set<String>()
+        return sections.filter { !$0.isShortcut }.compactMap { section in
             let hits = section.options.filter { option in
-                option.label.lowercased().contains(q)
-                    || option.resolvedSearchLabel.lowercased().contains(q)
-                    || option.keywords.contains { $0.lowercased().hasPrefix(q) }
+                guard !seen.contains(option.id) else { return false }
+                let hit = PickerSearch.matches(
+                    query: query, label: option.label,
+                    searchLabel: option.resolvedSearchLabel, keywords: option.keywords)
+                if hit { seen.insert(option.id) }
+                return hit
             }
             guard !hits.isEmpty else { return nil }
             return OWPickerSection(id: section.id, title: section.title,
-                                   caption: section.caption, options: hits)
+                                   caption: section.caption, isShortcut: section.isShortcut,
+                                   options: hits)
         }
     }
 

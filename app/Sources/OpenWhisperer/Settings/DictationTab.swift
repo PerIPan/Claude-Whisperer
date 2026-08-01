@@ -204,11 +204,11 @@ struct DictationTab: View {
                     .frame(maxWidth: .infinity)
                 }
                 .onChange(of: selectedLanguage) { _, newValue in
-                    if newValue == "auto" {
-                        try? FileManager.default.removeItem(at: Paths.sttLanguage)
-                    } else {
-                        try? newValue.write(to: Paths.sttLanguage, atomically: true, encoding: .utf8)
-                    }
+                    // Auto-detect writes the literal sentinel rather than deleting the file.
+                    // Deleting it used to mean "detect", but an absent file now means "never
+                    // chose" and `migrateDefaultSTTLanguage()` fills it with `en` on the next
+                    // launch — so removing it here would silently undo the user's choice.
+                    try? newValue.write(to: Paths.sttLanguage, atomically: true, encoding: .utf8)
                 }
 
                 OWInternalDivider()

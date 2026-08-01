@@ -533,6 +533,12 @@ enum ConfigManager {
     static func migrateDefaultSTTLanguage() {
         let stored = try? String(contentsOf: Paths.sttLanguage, encoding: .utf8)
         guard let language = STTLanguages.defaultedLanguage(existing: stored) else { return }
+        // Unlike the other migrations — which only rewrite files that already exist — this
+        // one creates a file, and on a first-ever launch Application Support/OpenWhisperer
+        // doesn't exist yet (`ensureDirectories()` runs later, from ServerManager/Setup).
+        // Without this the write fails silently and the whole first session runs on
+        // auto-detect, which is the behavior this migration exists to replace.
+        Paths.ensureDirectories()
         try? language.write(to: Paths.sttLanguage, atomically: true, encoding: .utf8)
     }
 

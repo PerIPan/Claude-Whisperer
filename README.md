@@ -110,12 +110,12 @@ Everything else lives in the **Settings** window (⌘,), across five tabs:
 **Dictation**
 - **Mode** — Hold-to-Talk (default), Press-to-Talk, or Hands-Free, with the trigger key (Ctrl, fn, Option, Cmd)
 - **Overlay** — off, or pick a style: Wave (default), LED Bars, Graph, Curtain
-- **Language** — set the dictation language to avoid hallucinations (auto-detect plus 17 languages)
+- **Language** — **all 100 languages Whisper supports**, searchable, and grouped by how well the model actually does: **Good accuracy** (56 languages at 35% word errors or fewer), **Limited accuracy** (9, each labelled with its own rate), and **Untested** (35 with no published benchmark). Nothing is hidden — whether a marginal language is usable depends on what you're dictating, so the app tells you what to expect instead of deciding for you. Rates come from OpenAI's published large-v3 benchmarks. **English is the default**; Auto-detect is still there as an explicit choice, but pinning a language avoids hallucinated text during silence and is measurably more accurate on short phrases
 - **Custom vocabulary** — a glossary of your own terms, edited in its own window; a fuzzy corrector post-fixes transcripts against it
 - **App Focus** — switch to a target app before typing, press Return afterwards, and hand focus back
 
 **Voice**
-- **Voice** — the full Kokoro-82M roster (~54 voices, grouped by language), plus **Dutch, German, Polish, Russian and Ukrainian** voices that Kokoro can't speak; non-default voices download on demand
+- **Voice** — **102 voices across 32 languages**, searchable: the full Kokoro-82M roster (~54 voices) plus **every one of the 24 languages Kokoro can't speak** — Arabic, Bulgarian, Croatian, Czech, Danish, Dutch, Estonian, Finnish, German, **Greek**, Hungarian, Indonesian, Korean, Latvian, Lithuanian, Polish, Romanian, Russian, Slovak, Slovenian, Swedish, Turkish, Ukrainian and Vietnamese. Rows show the language, the speaker, and whether it still needs downloading; **▶ previews any voice reading a sample in its own language**. Non-default voices download on demand
 - **Speed** (0.7×–1.5×, default 1.1×) and **Volume**
 - **Length** — how much is spoken: Terse, Normal (default), Rich, or **Full** (a spoken paragraph that explains the reasoning, not just the outcome)
 - **Speak** — Only when I dictate (default), On every turn, or **Only when I'm needed** (silent unless the turn ends on you)
@@ -219,10 +219,10 @@ Most settings are configured in the Settings window (voice, volume, language, ho
 | `TTS_URL` | `http://localhost:8000/v1/audio/speech` | `speak.sh` | Blocking synthesize-to-WAV endpoint |
 | `TTS_VOLUME` | `1` | `speak.sh` | Playback volume (the in-app player uses the menubar volume setting instead) |
 | `OW_TTS_STYLE` | menubar **Style** | hooks | Per-project spoken-summary style (`terse`/`normal`/`rich`/`full`); overrides the global `tts_style` |
-| `OW_TTS_VOICE` | menubar voice | hooks | Per-project voice id, Kokoro or `supertonic:<lang>:<style>` (any of its 31 languages, not just the five in the picker); overrides the global `tts_voice` |
+| `OW_TTS_VOICE` | menubar voice | hooks | Per-project voice id, Kokoro or `supertonic:<lang>:<style>` (any of its 31 languages — the picker shows the 24 Kokoro can't speak); overrides the global `tts_voice` |
 | `OW_TTS_RESPONSE` | menubar **Response** | hooks | Per-project response mode (`voice`/`always`/`needed`); overrides the global `tts_response_mode` |
 
-> **Tip:** Setting a specific language (e.g. English) instead of auto-detect prevents the model from hallucinating text in other languages during silence or background noise.
+> **Tip:** A specific language beats auto-detect. It prevents the model hallucinating text in other languages during silence or background noise, skips a decoding pass, and is more reliable on short phrases — which is most of what dictation produces. English is the default for exactly this reason; change it in Settings → Dictate if you dictate in something else.
 
 ## Troubleshooting
 
