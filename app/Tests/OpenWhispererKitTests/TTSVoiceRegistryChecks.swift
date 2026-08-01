@@ -75,6 +75,12 @@ func ttsVoiceRegistryFailures() -> [String] {
         failures.append("TTSVoiceRegistry: supertonic:el:M1 does not route to Greek")
     }
 
+    // 8 Kokoro languages (English is one language across the US and UK groups) + 24
+    // Supertonic. The About panel prints this, so a wrong count is user-visible copy.
+    if TTSVoiceRegistry.languageCount != 32 {
+        failures.append("TTSVoiceRegistry: expected 32 languages, got \(TTSVoiceRegistry.languageCount)")
+    }
+
     // Ids must be unique — duplicates would make the Settings picker ambiguous.
     let ids = all.map(\.id)
     if Set(ids).count != ids.count {

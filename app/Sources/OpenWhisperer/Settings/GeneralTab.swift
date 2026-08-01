@@ -173,16 +173,20 @@ struct GeneralTab: View {
 
                 OWInternalDivider()
 
+                // Counts are read from the rosters, never written here: the previous
+                // hardcoded copy ("9 languages, plus Supertonic-3 for Dutch, German,
+                // Polish, Russian and Ukrainian") silently went stale when the pickers
+                // were widened, and shipped wrong.
                 engineRow(icon: "waveform",
                           title: "Speech to text",
-                          detail: "WhisperKit large-v3 turbo — on the Apple Neural Engine, 99 languages")
+                          detail: "WhisperKit large-v3 turbo — on the Apple Neural Engine, \(STTLanguages.all.count) languages")
                 engineRow(icon: "speaker.wave.2",
                           title: "Text to speech",
-                          detail: "Kokoro-82M — ~54 voices across 9 languages, plus Supertonic-3 for Dutch, German, Polish, Russian and Ukrainian")
+                          detail: "Kokoro-82M and Supertonic-3 — \(TTSVoiceRegistry.allVoices.count) voices across \(TTSVoiceRegistry.languageCount) languages, on the Neural Engine")
 
                 OWInternalDivider()
 
-                Text("Three ways to dictate (hold, press, or hands-free), spoken replies for Claude Code, Codex, Pi and Antigravity, a live transcription overlay, and a custom vocabulary that corrects your own jargon.")
+                Text("Three ways to dictate (hold, press, or hands-free), spoken replies for Claude Code, Codex, Pi and Antigravity, and a live transcription overlay.")
                     .font(OWFont.caption(11))
                     .foregroundColor(OWColor.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)

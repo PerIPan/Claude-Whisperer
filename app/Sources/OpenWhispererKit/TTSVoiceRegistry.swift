@@ -165,4 +165,15 @@ public enum TTSVoiceRegistry {
     public static var allVoices: [TTSVoice] {
         groups.flatMap { $0.voices }
     }
+
+    /// Distinct spoken languages across both engines — fewer than `groups.count`, since
+    /// English is split into US and UK groups.
+    ///
+    /// Exists so user-facing copy can count the roster instead of restating it. The About
+    /// panel's hardcoded "9 languages, plus Supertonic-3 for Dutch, German, Polish,
+    /// Russian and Ukrainian" survived the 2026-08-01 widening unnoticed and was wrong in
+    /// the shipped build.
+    public static var languageCount: Int {
+        Set(allVoices.map(\.language)).count
+    }
 }

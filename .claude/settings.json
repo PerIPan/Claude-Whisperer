@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la \"$HOME/Library/Application Support/OpenWhisperer/\" 2>/dev/null || echo \"Directory does not exist\")",
+      "Read(//Users/peripan/Library/Application Support/OpenWhisperer/**)",
+      "Bash(ls -la /Users/peripan/dev/ | head -20)",
+      "Read(//Users/peripan/dev/**)",
+      "Bash(find /Users/peripan -type f -name \"DictationManager.swift\" 2>/dev/null)",
+      "Read(//Users/peripan/**)",
+      "Bash(bash /tmp/barge_hook_test.sh)",
+      "Bash('/Users/peripan/Library/Application Support/OpenWhisperer/venv/bin/python' -c 'import mlx_audio, os; print\\(os.path.dirname\\(mlx_audio.__file__\\)\\)')",
+      "Bash('/Users/peripan/Library/Application Support/OpenWhisperer/venv/bin/python' -c 'import anyio; print\\(anyio.to_thread.current_default_thread_limiter\\(\\).total_tokens\\)')",
+      "Bash('/Users/peripan/Library/Application Support/OpenWhisperer/venv/bin/python' -c 'import sounddevice; print\\('\\\\''sounddevice'\\\\'', sounddevice.__version__\\)')",
+      "Bash('/Users/peripan/Library/Application Support/OpenWhisperer/venv/bin/python' -m pytest tests/ -q)"
+    ]
+  }
+}
