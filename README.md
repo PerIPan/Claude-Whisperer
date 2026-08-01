@@ -29,7 +29,7 @@ xattr -d com.apple.quarantine ~/Downloads/OpenWhisperer-2.0.1.dmg
 
 ## What It Does
 
-You use your coding agent — **Claude Code, Codex, Antigravity, or Pi** — normally. After a turn you dictated by voice, the AI's reply is automatically spoken aloud through your Mac's speakers using a local TTS model, in a persona that matches your chosen voice (you can also set replies to always speak — see Response mode). Three voice input modes: **Press-to-Talk** (press hotkey to start/stop), **Hold-to-Talk** (hold hotkey to record, release to transcribe), or **Hands-Free** (say "initiate" to start recording, 3s silence auto-transcribes, say "hold on" to interrupt TTS).
+You use your coding agent — **Claude Code, Codex, Antigravity, or Pi** — normally. After a turn you dictated by voice, the AI's reply is automatically spoken aloud through your Mac's speakers using a local TTS model. Pick one of the nine accented English/European voices and the reply is written in a persona to match; pick one of the 24 multilingual voices and it's written in that language instead (you can also set replies to always speak — see Response mode). Three voice input modes: **Press-to-Talk** (press hotkey to start/stop), **Hold-to-Talk** (hold hotkey to record, release to transcribe), or **Hands-Free** (say "initiate" to start recording, 3s silence auto-transcribes, say "hold on" to interrupt TTS).
 
 Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
@@ -124,9 +124,7 @@ Everything else lives in the **Settings** window (⌘,), across five tabs:
 
 **Advanced** — model status (Whisper STT / TTS engines), the TTS server and port, delete downloaded models, server/events logs, and Copy Diagnostics.
 
-**General** (the logo tab) — version and engine summary, the permissions Open Whisperer needs, **Themes** (Cream · Light · Dark · Pastel · Champagne · Sky), and launch-at-login.
-
-**General** (the logo tab, on the right) — first-run and model-loading progress, launch at login, and the permission list (Accessibility, Microphone, and Speech Recognition in Hands-Free). Each row opens the matching System Settings pane; the logo tab is badged whenever a grant is missing.
+**General** (the logo tab, on the right) — version and engine summary, first-run and model-loading progress, **Themes** (Cream · Light · Dark · Pastel · Champagne · Sky), launch at login, and the permission list (Accessibility, Microphone, and Speech Recognition in Hands-Free). Each permission row opens the matching System Settings pane; the logo tab is badged whenever a grant is missing.
 
 Hover the **ⓘ** on any section for in-app help.
 
@@ -166,9 +164,9 @@ No button press needed. Uses on-device keyword detection (Apple Speech framework
 
 > **Note:** After rebuilding from source, you must remove and re-add the app in Accessibility settings (macOS caches the code signature).
 
-### App Focus Automation
+### App Focus
 
-Both features are in the **App Focus Automation** section of the menubar and require **Accessibility permission** (macOS will prompt you on first use).
+Both features live in **Settings → Dictation → App Focus** and require **Accessibility permission** (macOS will prompt you on first use).
 
 #### Auto-Focus
 
@@ -190,7 +188,7 @@ There's no special tag to add — voice mode works automatically. The app and it
 
 1. When you dictate, the app records a fingerprint of the text it inserted.
 2. The **UserPromptSubmit** hook recognizes that turn as a voice turn and quietly nudges the model to open its reply by calling an in-app `speak` tool with a short summary that stands alone.
-3. The model calls `speak` and the app synthesizes it sentence-by-sentence through the local Kokoro TTS model — so speech starts mid-turn, not after the whole reply lands. (There is no Stop hook; Pi uses an equivalent extension instead of a hook + tool.)
+3. The model calls `speak` and the app synthesizes it sentence-by-sentence on-device — through Kokoro, or Supertonic-3 if you picked one of the 24 languages Kokoro can't speak — so speech starts mid-turn, not after the whole reply lands. (There is no Stop hook; Pi uses an equivalent extension instead of a hook + tool.)
 
 - **Screen**: you see the full detailed response
 - **Speakers**: you hear the spoken opening summary
@@ -199,7 +197,7 @@ This "dictated turns only" behavior is the default. The **Response** control in 
 
 ### Voice Style Levels
 
-Choose how verbose that opening summary should be (set in **Settings → Voice → Style**):
+Choose how verbose that opening summary should be (set in **Settings → Voice → Length**):
 
 | Level | Spoken summary |
 |-------|----------------|
@@ -218,7 +216,7 @@ Most settings are configured in the Settings window (voice, volume, language, ho
 | `TTS_PLAY_URL` | `http://localhost:8000/v1/audio/play` | hooks | In-app streaming-playback endpoint (loopback only) |
 | `TTS_URL` | `http://localhost:8000/v1/audio/speech` | `speak.sh` | Blocking synthesize-to-WAV endpoint |
 | `TTS_VOLUME` | `1` | `speak.sh` | Playback volume (the in-app player uses the menubar volume setting instead) |
-| `OW_TTS_STYLE` | menubar **Style** | hooks | Per-project spoken-summary style (`terse`/`normal`/`rich`/`full`); overrides the global `tts_style` |
+| `OW_TTS_STYLE` | Settings → Voice → **Length** | hooks | Per-project spoken-summary length (`terse`/`normal`/`rich`/`full`); overrides the global `tts_style` |
 | `OW_TTS_VOICE` | menubar voice | hooks | Per-project voice id, Kokoro or `supertonic:<lang>:<style>` (any of its 31 languages — the picker shows the 24 Kokoro can't speak); overrides the global `tts_voice` |
 | `OW_TTS_RESPONSE` | menubar **Response** | hooks | Per-project response mode (`voice`/`always`/`needed`); overrides the global `tts_response_mode` |
 
@@ -257,7 +255,7 @@ Most settings are configured in the Settings window (voice, volume, language, ho
   brew install jq
   ```
 
-There is **no Python, virtualenv, or `pip`/`uv` step** — speech-to-text and text-to-speech are native Swift (WhisperKit for STT, FluidAudio Kokoro for TTS) and run in-process on the Apple Neural Engine.
+There is **no Python, virtualenv, or `pip`/`uv` step** — speech-to-text and text-to-speech are native Swift (WhisperKit for STT; FluidAudio Kokoro and Supertonic-3 for TTS) and run in-process on the Apple Neural Engine.
 
 ### Step 1: Build the app
 
@@ -299,7 +297,9 @@ swift run OpenWhisperer --serve-tts   # serves http://localhost:8000 (set TTS_PO
 
 ```
 OpenWhisperer/
-├── CLAUDE.md                 # Guidance for AI assistants working on this repo
+├── CLAUDE.md                 # Orientation for AI assistants working on this repo
+├── AGENTS.md                 # Project rules, commands and architecture (the detailed one)
+├── docs/                     # Design specs and implementation plans
 ├── hooks/
 │   ├── voice-context.sh      # Claude Code / Codex UserPromptSubmit hook — voice-turn detection
 │   ├── voice-shared.sh       # Shared voice-turn classification logic
@@ -311,7 +311,7 @@ OpenWhisperer/
 └── app/                      # macOS menubar app (Swift Package)
     ├── Package.swift
     ├── Sources/
-    │   ├── OpenWhisperer/     # App + native STT (WhisperKit) + native TTS (FluidAudio Kokoro)
+    │   ├── OpenWhisperer/     # App + native STT (WhisperKit) + native TTS (Kokoro, Supertonic-3)
     │   └── OpenWhispererKit/  # Pure, unit-tested logic
     ├── Tests/
     ├── Resources/
@@ -329,8 +329,9 @@ The native rewrite at the heart of this app — replacing the out-of-process Pyt
 ## Credits
 
 - [WhisperKit](https://github.com/argmaxinc/WhisperKit) — on-device speech-to-text (CoreML / Apple Neural Engine)
-- [FluidAudio](https://github.com/FluidInference/FluidAudio) — on-device Kokoro text-to-speech (CoreML / Apple Neural Engine)
-- [Kokoro](https://huggingface.co/prince-canuma/Kokoro-82M) — TTS model
+- [FluidAudio](https://github.com/FluidInference/FluidAudio) — on-device Kokoro and Supertonic-3 text-to-speech (CoreML / Apple Neural Engine)
+- [Kokoro](https://huggingface.co/prince-canuma/Kokoro-82M) — TTS model (English and eight other languages)
+- [Supertonic-3](https://github.com/FluidInference/FluidAudio) — multilingual TTS model, via FluidAudio
 - [jq](https://jqlang.github.io/jq/) — JSON processor (used by the hooks)
 - [Claude Code](https://claude.ai/claude-code) — Anthropic's CLI
 - [Codex CLI](https://github.com/openai/codex) — OpenAI's CLI agent
