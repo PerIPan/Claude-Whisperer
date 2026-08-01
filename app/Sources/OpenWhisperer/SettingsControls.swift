@@ -531,6 +531,12 @@ struct OWAppPicker: View {
             .padding(8)
             .background(OWColor.page)
         }
+        // Picking a row clears `query`, but dismissing by click-outside or Escape does not,
+        // so reopening would show a stale filtered list with no hint why. Same fix as
+        // `OWSearchablePicker`; this control predates it and had the bug independently.
+        .onChange(of: showPopover) { _, shown in
+            if !shown { query = "" }
+        }
     }
 
     private var filteredApps: [AppEntry] {
