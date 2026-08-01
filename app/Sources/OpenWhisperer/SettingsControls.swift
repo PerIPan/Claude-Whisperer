@@ -245,37 +245,66 @@ struct OWMenuPicker<T: Hashable>: View {
     }
 }
 
-// MARK: - OWGroupedMenuPicker (OWMenuPicker with one nested submenu per group)
+// MARK: - OWSearchablePicker (sectioned, searchable, captioned popover picker)
 
-/// Like `OWMenuPicker`, but renders `groups` as nested submenus (a `Menu` per
-/// group) so a long option list (e.g. ~50 voices) stays navigable instead of one
-/// flat scroll. Same collapsed control/styling as `OWMenuPicker`.
-struct OWGroupedMenuPicker<T: Hashable>: View {
-    @Binding var selection: T
-    let groups: [(group: String, options: [(id: T, label: String)])]
+/// One row in an `OWSearchablePicker`.
+struct OWPickerOption: Identifiable, Equatable {
+    let id: String
+    /// Shown when the list is browsed by section.
+    let label: String
+    /// Shown instead of `label` while a search is active, when the section header is no
+    /// longer next to the row to give it context (`Greek · F1 · Female`). Defaults to `label`.
+    var searchLabel: String?
+    /// Small trailing annotation (`~40% errors`). Nil for most rows — a badge every row
+    /// carries is noise that belongs in the section caption instead.
+    var badge: String?
+    /// Extra terms the search should match beyond the labels — ISO codes, mainly.
+    var keywords: [String] = []
+
+    var resolvedSearchLabel: String { searchLabel ?? label }
+}
+
+/// A group of options with an optional explanatory caption.
+struct OWPickerSection: Identifiable {
+    let id: String
+    /// Uppercased header. Empty for a leading section that needs no title (a pinned row).
+    let title: String
+    /// One line explaining what the section means. This is the point of the control:
+    /// a category should never have to be inferred from its name.
+    var caption: String?
+    let options: [OWPickerOption]
+}
+
+/// `OWMenuPicker`'s collapsed control over a searchable popover list.
+///
+/// Replaces `OWGroupedMenuPicker` (nested submenus), which stopped scaling once Dictate
+/// grew to 100 languages and Voice to 33 language groups: submenus have no search, and
+/// finding "Malayalam" meant knowing which submenu it lived in.
+///
+/// Sections carry captions and rows carry badges so both pickers can explain themselves
+/// inline rather than in a help tooltip nobody opens.
+struct OWSearchablePicker: View {
+    @Binding var selection: String
+    let sections: [OWPickerSection]
+    var placeholder: String = "Search…"
+    /// Shown collapsed when `selection` matches nothing — a stale pref, mainly.
+    var emptyLabel: String = "Select…"
+    /// Fully-qualified text for the collapsed control (`Greek · F1 (Female)`). The row
+    /// label alone is often ambiguous once section headers are out of view.
+    var currentLabelOverride: String?
+
+    @State private var showPopover = false
+    @State private var query = ""
 
     var body: some View {
-        Menu {
-            ForEach(groups, id: \.group) { group in
-                Menu(group.group) {
-                    ForEach(group.options, id: \.id) { option in
-                        Button {
-                            selection = option.id
-                        } label: {
-                            if option.id == selection {
-                                Label(option.label, systemImage: "checkmark")
-                            } else {
-                                Text(option.label)
-                            }
-                        }
-                    }
-                }
-            }
+        Button {
+            showPopover.toggle()
         } label: {
             HStack(spacing: 4) {
                 Text(currentLabel)
                     .font(OWFont.body(11))
                     .foregroundColor(OWColor.ink)
+                    .lineLimit(1)
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 8, weight: .medium))
@@ -291,16 +320,120 @@ struct OWGroupedMenuPicker<T: Hashable>: View {
                             .strokeBorder(OWColor.checkboxBorder, lineWidth: 1)
                     )
             )
+            .contentShape(Rectangle())
         }
-        .menuStyle(.button)
         .buttonStyle(.plain)
+        .popover(isPresented: $showPopover, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 6) {
+                TextField(placeholder, text: $query)
+                    .textFieldStyle(.roundedBorder)
+                    .font(OWFont.body(11))
+
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 1) {
+                        ForEach(filteredSections) { section in
+                            if !section.title.isEmpty {
+                                header(section.title)
+                            }
+                            // Captions are hidden while searching: the result list is a
+                            // flat set of matches, so a section's explanation no longer
+                            // describes what sits under it.
+                            if let caption = section.caption, isSearching == false {
+                                Text(caption)
+                                    .font(OWFont.body(9))
+                                    .foregroundColor(OWColor.inkSoft)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding(.horizontal, 18)
+                                    .padding(.bottom, 2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            ForEach(section.options) { option in
+                                row(option)
+                            }
+                        }
+                        if filteredSections.isEmpty {
+                            Text("No matches")
+                                .font(OWFont.body(11))
+                                .foregroundColor(OWColor.inkSoft)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 8)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .frame(width: 268, height: 280)
+            }
+            .padding(8)
+            .background(OWColor.page)
+        }
+    }
+
+    private var isSearching: Bool {
+        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var filteredSections: [OWPickerSection] {
+        guard isSearching else { return sections }
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return sections.compactMap { section in
+            let hits = section.options.filter { option in
+                option.label.lowercased().contains(q)
+                    || option.resolvedSearchLabel.lowercased().contains(q)
+                    || option.keywords.contains { $0.lowercased().hasPrefix(q) }
+            }
+            guard !hits.isEmpty else { return nil }
+            return OWPickerSection(id: section.id, title: section.title,
+                                   caption: section.caption, options: hits)
+        }
     }
 
     private var currentLabel: String {
-        for g in groups {
-            if let m = g.options.first(where: { $0.id == selection }) { return m.label }
+        if let override = currentLabelOverride, !override.isEmpty { return override }
+        for section in sections {
+            if let hit = section.options.first(where: { $0.id == selection }) { return hit.label }
         }
-        return ""
+        return emptyLabel
+    }
+
+    private func header(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(OWFont.body(9))
+            .foregroundColor(OWColor.ink.opacity(0.5))
+            .padding(.top, 6)
+            .padding(.horizontal, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func row(_ option: OWPickerOption) -> some View {
+        Button {
+            selection = option.id
+            query = ""
+            showPopover = false
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .frame(width: 12)
+                    .foregroundColor(OWColor.accent)
+                    .opacity(option.id == selection ? 1 : 0)
+                Text(isSearching ? option.resolvedSearchLabel : option.label)
+                    .font(OWFont.body(11))
+                    .foregroundColor(OWColor.ink)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                if let badge = option.badge {
+                    Text(badge)
+                        .font(OWFont.body(9))
+                        .foregroundColor(OWColor.inkSoft)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.vertical, 3)
+            .padding(.horizontal, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

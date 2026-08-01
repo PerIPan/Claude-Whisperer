@@ -1,28 +1,133 @@
 import Foundation
 import OpenWhispererKit
+import WhisperKit
 
 /// Static option tables shared by the Settings tabs (moved verbatim from MenuBarView
 /// so Dictation/Voice don't each keep their own copy).
 enum SettingsData {
-    /// Full Kokoro-82M v1.0 roster, grouped by language for the nested-submenu picker.
-    /// Non-default voices download on first selection via `KokoroTTS.ensureVoicePack`.
-    static let voiceGroups: [(group: String, options: [(id: String, label: String)])] = {
-        TTSVoiceRegistry.groups.map { group in
-            (group.name, group.voices.map { ($0.id, "\($0.name) (\($0.gender.prefix(1)))") })
-        }
-    }()
-
     static let allVoices: [(id: String, label: String)] = {
         TTSVoiceRegistry.allVoices.map { ($0.id, "\($0.name) (\($0.gender.prefix(1)))") }
     }()
 
-    static let languages: [(id: String, label: String)] = [
-        ("auto", "Auto-detect"), ("en", "English"), ("es", "Spanish"), ("fr", "French"),
-        ("de", "German"), ("it", "Italian"), ("pt", "Portuguese"), ("nl", "Dutch"),
-        ("ja", "Japanese"), ("ko", "Korean"), ("zh", "Chinese"), ("ar", "Arabic"),
-        ("hi", "Hindi"), ("ru", "Russian"), ("pl", "Polish"), ("tr", "Turkish"),
-        ("uk", "Ukrainian"), ("sv", "Swedish"),
-    ]
+    // MARK: - Voice (TTS)
+
+    /// Voice picker sections: Kokoro's nine language groups, then the 24 Supertonic
+    /// languages Kokoro can't speak. Rows are self-describing because the picker is
+    /// searchable — under a query, section headers scroll out of view.
+    static var voiceSections: [OWPickerSection] {
+        TTSVoiceRegistry.groups.map { group in
+            let isSupertonic = group.voices.allSatisfy { TTSVoiceRouter.isSupertonic($0.id) }
+            return OWPickerSection(
+                id: group.name,
+                title: "\(group.name) · \(isSupertonic ? "Supertonic" : "Kokoro")",
+                // F1/M1 read as accents or quality grades unless told otherwise. This was
+                // settled in the 2.0.0 design and only ever lived in that doc until now.
+                caption: isSupertonic ? "Speaker styles, not regional accents." : nil,
+                options: group.voices.map { voice in
+                    OWPickerOption(
+                        id: voice.id,
+                        label: "\(voice.name) · \(voice.gender)",
+                        searchLabel: "\(group.name) · \(voice.name) · \(voice.gender)",
+                        badge: VoiceCache.isCached(voice.id) ? nil : "downloads",
+                        keywords: [voice.language, TTSVoiceRouter.route(voice.id).language ?? ""]
+                    )
+                }
+            )
+        }
+    }
+
+    /// Fully-qualified label for the collapsed control — `Greek · F1 (Female)`. The bare
+    /// voice name is ambiguous once the menu is closed: `F1 (F)` named no language at all.
+    static func voiceLabel(_ voiceID: String) -> String {
+        for group in TTSVoiceRegistry.groups {
+            if let voice = group.voices.first(where: { $0.id == voiceID }) {
+                return "\(group.name) · \(voice.name) (\(voice.gender))"
+            }
+        }
+        return voiceID
+    }
+
+    /// The language a voice speaks, when that differs from the conversation's language and
+    /// so changes what the model is told to write. Nil for English voices and unknowns.
+    static func voiceLanguageName(_ voiceID: String) -> String? {
+        guard TTSVoiceRouter.isSupertonic(voiceID) else { return nil }
+        for group in TTSVoiceRegistry.groups where group.voices.contains(where: { $0.id == voiceID }) {
+            return group.name
+        }
+        return nil
+    }
+
+    // MARK: - Dictate (STT)
+
+    /// Every language WhisperKit accepts, intersected with what the linked build actually
+    /// knows so the picker can never offer a code the decoder would reject. The table is
+    /// hand-maintained (`STTLanguages`) because WhisperKit's own map is a dictionary with
+    /// no stable order and carries alias names.
+    static let languages: [(id: String, label: String)] = {
+        let supported = Constants.languageCodes
+        return [(STTLanguages.autoCode, "Auto-detect")]
+            + STTLanguages.all.filter { supported.contains($0.code) }.map { ($0.code, $0.name) }
+    }()
+
+    /// Dictate picker sections. Auto-detect is pinned first, then the shortlist, then the
+    /// full roster split by measured quality. Nothing is hidden — the tiers only say how
+    /// much to expect, which is a judgement the app can't make for the user.
+    static var languageSections: [OWPickerSection] {
+        let supported = Constants.languageCodes
+        let available = STTLanguages.all.filter { supported.contains($0.code) }
+
+        func options(_ langs: [STTLanguage], badged: Bool) -> [OWPickerOption] {
+            langs.map { lang in
+                OWPickerOption(
+                    id: lang.code,
+                    label: lang.name,
+                    // Each language's own number, not the tier boundary: Bengali at 40%
+                    // and Albanian at 56% are not the same choice.
+                    badge: badged ? lang.errorRate.map { "~\(Int($0.rounded()))% errors" } : nil,
+                    keywords: [lang.code]
+                )
+            }
+        }
+
+        var sections: [OWPickerSection] = [
+            OWPickerSection(id: "auto", title: "", caption: nil, options: [
+                OWPickerOption(id: STTLanguages.autoCode, label: "Auto-detect",
+                               keywords: ["auto", "detect"])
+            ]),
+            OWPickerSection(
+                id: "common", title: "Common",
+                caption: "The usual shortlist. All also appear under Good accuracy.",
+                options: options(STTLanguages.common.compactMap { code in
+                    available.first { $0.code == code }
+                }, badged: false)
+            ),
+        ]
+
+        let good = available.filter { $0.tier == .good }
+        if !good.isEmpty {
+            sections.append(OWPickerSection(
+                id: "good", title: "Good accuracy",
+                caption: "35% word errors or fewer in OpenAI's large-v3 benchmarks.",
+                options: options(good, badged: false)))
+        }
+        let limited = available.filter { $0.tier == .limited }
+        if !limited.isEmpty {
+            sections.append(OWPickerSection(
+                id: "limited", title: "Limited accuracy",
+                caption: "More than 35% word errors. Fine for short phrases; expect to correct.",
+                options: options(limited, badged: true)))
+        }
+        let untested = available.filter { $0.tier == .untested }
+        if !untested.isEmpty {
+            // No per-row badge: 35 rows repeating one string is noise, so the caption
+            // carries it once.
+            sections.append(OWPickerSection(
+                id: "untested", title: "Untested",
+                caption: "Whisper accepts these, but OpenAI published no accuracy figures.",
+                options: options(untested, badged: false)))
+        }
+        return sections
+    }
 
     /// Spoken-summary length, shortest to longest. "Full" is a real tier again as of 2.0.0
     /// (a spoken paragraph that explains rather than summarizes); it used to be a legacy

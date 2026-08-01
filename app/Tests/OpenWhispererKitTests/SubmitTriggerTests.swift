@@ -29,6 +29,8 @@ struct KitTestRunner {
         failures += vocabularyCorrectorFailures()
         failures += vocabularyPromptFailures()
         failures += disfluencyFilterFailures()
+        failures += sttLanguageFailures()
+        failures += ttsSampleTextFailures()
 
         if failures.isEmpty {
             print("✅ OpenWhispererKit: all checks passed")

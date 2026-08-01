@@ -108,20 +108,49 @@ public enum TTSVoiceRegistry {
     /// these as an English voice reading foreign text — measurably unintelligible (a Dutch ASR
     /// read-back of Kokoro's Dutch scores ~100% WER; Supertonic-3's scores ~4%).
     ///
-    /// Curated deliberately. All 31 Supertonic languages ride in the one model, so this list
-    /// costs nothing to extend — it's a UI-clutter decision, not a bytes decision, and these
-    /// five are the ones whose output has been listened to and ASR-verified. A power user can
-    /// name any language `TTSVoiceRouter.supertonicLanguages` accepts via `OW_TTS_VOICE`.
+    /// **Every** Supertonic language Kokoro cannot speak, as of 2026-08-01 — widened from a
+    /// curated five on owner request. All 31 ride in the one ~264 MB model, fetched on demand
+    /// the first time any `supertonic:*` voice is used, so listing a language costs zero extra
+    /// bytes. The earlier five were the ones that had been listened to and ASR-verified; the
+    /// rest are the same model and the same pipeline, so withholding them bought nothing but a
+    /// shorter menu. **Do not re-narrow this list.**
+    ///
+    /// The seven languages Kokoro also covers (en, es, fr, it, pt, hi, ja) stay Kokoro-only,
+    /// so no language appears under two groups and the picker never asks the user to choose an
+    /// engine. `TTSVoiceRouter.supertonicLanguages` still accepts all 31 for `OW_TTS_VOICE`.
+    ///
+    /// Group names must match the language names `resolve_language_line()` emits in
+    /// `hooks/voice-shared.sh` — the Voice tab caption and the model's nudge would otherwise
+    /// disagree. `HookTests` asserts it.
     ///
     /// Two styles each (one female, one male) rather than all ten: F1–F5/M1–M5 are generic
     /// speaker styles, not per-language accents, so eight more rows per language would add
     /// length without adding meaningful choice.
     static let supertonicGroups: [TTSVoiceGroup] = [
+        ("Arabic", "ar", "SA"),
+        ("Bulgarian", "bg", "BG"),
+        ("Croatian", "hr", "HR"),
+        ("Czech", "cs", "CZ"),
+        ("Danish", "da", "DK"),
         ("Dutch", "nl", "NL"),
+        ("Estonian", "et", "EE"),
+        ("Finnish", "fi", "FI"),
         ("German", "de", "DE"),
+        ("Greek", "el", "GR"),
+        ("Hungarian", "hu", "HU"),
+        ("Indonesian", "id", "ID"),
+        ("Korean", "ko", "KR"),
+        ("Latvian", "lv", "LV"),
+        ("Lithuanian", "lt", "LT"),
         ("Polish", "pl", "PL"),
+        ("Romanian", "ro", "RO"),
         ("Russian", "ru", "RU"),
+        ("Slovak", "sk", "SK"),
+        ("Slovenian", "sl", "SI"),
+        ("Swedish", "sv", "SE"),
+        ("Turkish", "tr", "TR"),
         ("Ukrainian", "uk", "UA"),
+        ("Vietnamese", "vi", "VN"),
     ].map { label, code, region in
         TTSVoiceGroup(name: label, voices: [
             TTSVoice(

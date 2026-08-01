@@ -6,6 +6,7 @@ import Foundation
 var failures: [String] = []
 failures += voiceContextFailures()
 failures += agyPreInvocationFailures()
+failures += voiceLanguageParityFailures()
 
 if failures.isEmpty {
     print("✅ HookTests: all checks passed")

@@ -155,10 +155,13 @@ func mcpServerFailures() -> [String] {
            let bodyData = text.data(using: .utf8),
            let voicesObj = (try? JSONSerialization.jsonObject(with: bodyData)) as? [String: Any],
            let voicesList = voicesObj["voices"] as? [[String: Any]] {
-            // 54 Kokoro + 10 multilingual (5 curated languages × F1/M1).
-            if voicesList.count != 64 { failures.append("list_voices tool: expected 64 voices, got \(voicesList.count)") }
+            // 54 Kokoro + 48 multilingual (24 languages × F1/M1).
+            if voicesList.count != 102 { failures.append("list_voices tool: expected 102 voices, got \(voicesList.count)") }
             if !voicesList.contains(where: { ($0["id"] as? String) == "supertonic:nl:F1" }) {
                 failures.append("list_voices tool: missing the Dutch supertonic:nl:F1 voice")
+            }
+            if !voicesList.contains(where: { ($0["id"] as? String) == "supertonic:el:F1" }) {
+                failures.append("list_voices tool: missing the Greek supertonic:el:F1 voice")
             }
             if let heart = voicesList.first(where: { ($0["id"] as? String) == "af_heart" }) {
                 if (heart["cached"] as? Bool) != true { failures.append("list_voices tool: af_heart cached should be true") }

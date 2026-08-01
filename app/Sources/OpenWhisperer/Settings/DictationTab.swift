@@ -195,8 +195,13 @@ struct DictationTab: View {
                              help: "The language you dictate in, and a glossary of your own terms that transcripts are fuzzy-corrected against.")
 
                 OWPickerRow(label: "Language", labelWidth: 62) {
-                    OWMenuPicker(selection: $selectedLanguage, options: SettingsData.languages)
-                        .frame(maxWidth: .infinity)
+                    OWSearchablePicker(
+                        selection: $selectedLanguage,
+                        sections: SettingsData.languageSections,
+                        placeholder: "Search languages…",
+                        emptyLabel: "Auto-detect"
+                    )
+                    .frame(maxWidth: .infinity)
                 }
                 .onChange(of: selectedLanguage) { _, newValue in
                     if newValue == "auto" {

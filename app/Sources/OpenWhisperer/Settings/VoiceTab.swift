@@ -3,11 +3,17 @@ import OpenWhispererKit
 
 /// Spoken replies (TTS output only): which voice, how fast/loud, how much, and when.
 struct VoiceTab: View {
+    @EnvironmentObject var serverManager: ServerManager
+
     @State private var selectedVoice = "af_heart"
     @State private var selectedSpeed: Double = Double(TTSSpeed.default)
     @State private var selectedVolume: Double = 1.0
     @State private var selectedStyle = "normal"
     @State private var selectedResponse = "voice"
+    /// Held in state, not recomputed per redraw: each row's badge stats the filesystem,
+    /// and `body` runs far more often than the cache changes.
+    @State private var voiceSections: [OWPickerSection] = []
+    @State private var isPreviewing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -17,11 +23,45 @@ struct VoiceTab: View {
                                  help: "The voice that reads replies aloud, and how fast and loud it speaks. Non-default voices download on first use.")
 
                     OWPickerRow(label: "Voice", labelWidth: 62) {
-                        OWGroupedMenuPicker(selection: $selectedVoice, groups: SettingsData.voiceGroups)
+                        HStack(spacing: 6) {
+                            OWSearchablePicker(
+                                selection: $selectedVoice,
+                                sections: voiceSections,
+                                placeholder: "Search voices…",
+                                emptyLabel: "Select voice…",
+                                currentLabelOverride: SettingsData.voiceLabel(selectedVoice)
+                            )
                             .frame(maxWidth: .infinity)
+
+                            Button {
+                                preview()
+                            } label: {
+                                Image(systemName: isPreviewing ? "speaker.wave.2.fill" : "play.fill")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(OWColor.accent)
+                                    .frame(width: 22, height: 22)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .help("Hear this voice read a sample in its own language.")
+                        }
                     }
                     .onChange(of: selectedVoice) { _, newValue in
                         try? newValue.write(to: Paths.ttsVoice, atomically: true, encoding: .utf8)
+                        // Cache state changes as soon as a preview or reply downloads a
+                        // pack, and the section list bakes it into each row's badge.
+                        voiceSections = SettingsData.voiceSections
+                    }
+
+                    // The genuinely surprising half of picking a non-English voice: the
+                    // model is told to write the spoken text in that language too
+                    // (resolve_language_line in voice-shared.sh). Nothing said so before.
+                    if let language = SettingsData.voiceLanguageName(selectedVoice) {
+                        Text("Replies will be spoken in \(language). Your on-screen reply stays in the language of the conversation.")
+                            .font(OWFont.caption())
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
                     OWInternalDivider()
@@ -102,7 +142,31 @@ struct VoiceTab: View {
         .onAppear(perform: load)
     }
 
+    /// Speak a sample **in the selected voice's own language** — an English line read by a
+    /// Greek voice would demonstrate the exact unintelligibility Supertonic-3 exists to fix.
+    ///
+    /// Goes through the same controller replies use, so it honors the current speed and
+    /// volume and shares its barge-in: starting a preview stops whatever is already
+    /// playing rather than overlapping it. On an uncached voice this triggers the normal
+    /// on-demand download, which the row's "downloads" badge has already disclosed.
+    private func preview() {
+        let voice = selectedVoice
+        let speed = Float(selectedSpeed)
+        isPreviewing = true
+        serverManager.playback.bargeIn()
+        serverManager.playback.play(
+            text: TTSSampleText.sample(forVoiceID: voice), voice: voice, speed: speed)
+        // The controller is fire-and-forget, so this only un-highlights the button; the
+        // audio is unaffected either way.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+            isPreviewing = false
+            // A first preview may have just downloaded the pack.
+            voiceSections = SettingsData.voiceSections
+        }
+    }
+
     private func load() {
+        voiceSections = SettingsData.voiceSections
         selectedVolume = Double(TTSVolume.parse(try? String(contentsOf: Paths.ttsVolume, encoding: .utf8)))
         selectedSpeed = Double(TTSSpeed.parse(try? String(contentsOf: Paths.ttsSpeed, encoding: .utf8)))
         if let savedVoice = try? String(contentsOf: Paths.ttsVoice, encoding: .utf8),

@@ -519,6 +519,23 @@ enum ConfigManager {
         try? fm.moveItem(at: Paths.legacyVoiceDetail, to: Paths.ttsStyle)
     }
 
+    /// One-shot: make English the stored dictation language when nothing is stored.
+    ///
+    /// Auto-detect used to be the implicit default (a missing `stt_language` file leaves
+    /// `DecodingOptions.detectLanguage` on). It is now an explicit choice instead: detection
+    /// costs a decoder pass and is least reliable on short clips, which is most of what
+    /// dictation produces, and the owner measured fewer errors with English pinned
+    /// (2026-08-01). **Do not restore Auto-detect as the default.**
+    ///
+    /// Writing the file rather than defaulting in the reader keeps Settings honest — the
+    /// picker shows the language actually in force instead of an invisible fallback. A
+    /// stored value of any kind, `auto` included, is left alone.
+    static func migrateDefaultSTTLanguage() {
+        let stored = try? String(contentsOf: Paths.sttLanguage, encoding: .utf8)
+        guard let language = STTLanguages.defaultedLanguage(existing: stored) else { return }
+        try? language.write(to: Paths.sttLanguage, atomically: true, encoding: .utf8)
+    }
+
     /// One-shot cleanup: transcription history moved to the menubar dropdown (2026-07-13)
     /// and the overlay's resize grip went with it — delete the grip's orphaned pref file.
     static func removeLegacyOverlayLines() {

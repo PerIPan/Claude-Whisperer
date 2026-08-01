@@ -137,26 +137,7 @@ final class TTSHTTPServer {
         case ("POST", "/mcp"):
             // Minimal MCP over Streamable HTTP. All JSON-RPC shaping is pure (OpenWhispererKit);
             // here we only map the outcome onto HTTP and perform the one side effect (playback).
-            let isVoiceCached: (String) -> Bool = { voice in
-                let home = FileManager.default.homeDirectoryForCurrentUser
-                // Multilingual voices share one Supertonic model across every language and
-                // style, so cache state is per-model, not per-voice: all of them flip to
-                // cached together once the pipeline is on disk.
-                if TTSVoiceRouter.isSupertonic(voice) {
-                    let marker = home.appendingPathComponent(
-                        ".cache/fluidaudio/Models/supertonic-3/TextEncoder.mlmodelc").path
-                    return FileManager.default.fileExists(atPath: marker)
-                }
-                let sanitized = voice.filter { $0.isLetter || $0.isNumber || $0 == "_" }
-                guard !sanitized.isEmpty else { return false }
-                if sanitized == "af_heart" { return true }
-                let path = home.appendingPathComponent(".cache/fluidaudio/Models/kokoro-82m-coreml/ANE/\(sanitized).bin").path
-                guard FileManager.default.fileExists(atPath: path) else { return false }
-                let attrs = try? FileManager.default.attributesOfItem(atPath: path)
-                let size = (attrs?[.size] as? NSNumber)?.uint64Value ?? 0
-                return size > 1000
-            }
-            switch MCPServer().handle(req.body, isVoiceCached: isVoiceCached) {
+            switch MCPServer().handle(req.body, isVoiceCached: VoiceCache.isCached) {
             case .json(let data):
                 respond(conn, "200 OK", data, contentType: "application/json")
             case .accepted:

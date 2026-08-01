@@ -23,6 +23,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ConfigManager.migrateVoiceDetailToTtsStyle()
         // The `text` response mode was removed — coerce any persisted value to the default.
         ConfigManager.migrateRemoveTextResponseMode()
+        // Pin English when no dictation language is stored — must run before the Settings
+        // UI or DictationManager reads the file, so both see the same value.
+        ConfigManager.migrateDefaultSTTLanguage()
         // Strip the obsolete Stop hook (replaced by the speak MCP tool) from existing installs.
         ConfigManager.migrateRemoveClaudeStopHook()
         // Delete the orphaned overlay_lines pref (grip removed with menubar history).
