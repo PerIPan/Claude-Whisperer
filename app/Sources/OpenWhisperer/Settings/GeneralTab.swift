@@ -1,5 +1,6 @@
 import SwiftUI
 import ServiceManagement
+import OpenWhispererKit
 
 /// "Is everything OK" tab: first-run/model health, startup, the canonical permission
 /// list, and the version footer.
@@ -8,6 +9,7 @@ struct GeneralTab: View {
     @EnvironmentObject var setupManager: SetupManager
     @EnvironmentObject var dictationManager: DictationManager
     @EnvironmentObject var accessibilityManager: AccessibilityManager
+    @ObservedObject private var themeManager = ThemeManager.shared
 
     @State private var launchAtLogin = false
     @State private var diagnosticsCopied = false
@@ -54,6 +56,7 @@ struct GeneralTab: View {
                 }
             }
 
+            themesCard
             startupCard
         }
         // Version now lives in the tab bar (right of the tabs), so no footer here.
@@ -72,6 +75,38 @@ struct GeneralTab: View {
             DispatchQueue.global(qos: .userInitiated).async {
                 let enabled = SMAppService.mainApp.status == .enabled
                 DispatchQueue.main.async { launchAtLogin = enabled }
+            }
+        }
+    }
+
+    /// Appearance picker. Sits above Startup so the set-once login toggle stays last.
+    private var themesCard: some View {
+        OWCard {
+            VStack(alignment: .leading, spacing: 10) {
+                OWCardHeader(title: "Themes", icon: "paintpalette",
+                             help: "The app's colour palette — Settings, the menubar popover and "
+                                 + "the overlay all follow it. Cream is Open Whisperer's own "
+                                 + "identity and the only theme that follows your system's "
+                                 + "light/dark setting; the rest hold their look either way.")
+
+                OWPickerRow(label: "Theme", labelWidth: 62) {
+                    OWMenuPicker(
+                        selection: Binding(
+                            get: { themeManager.theme.rawValue },
+                            set: { themeManager.theme = OWTheme.parse($0) }
+                        ),
+                        options: OWTheme.allCases.map { ($0.rawValue, $0.label) })
+                        .frame(maxWidth: .infinity)
+                }
+
+                // Matches the Dictation tab's mode caption (11pt / inkSoft) rather than the
+                // fainter 10pt default — this line carries the follows-system-vs-fixed caveat,
+                // so it is the last place to under-emphasise.
+                Text(themeManager.theme.summary)
+                    .font(OWFont.caption(11))
+                    .foregroundColor(OWColor.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }

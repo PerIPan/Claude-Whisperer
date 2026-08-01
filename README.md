@@ -24,7 +24,7 @@ The command to bypass Gatekeeper for the DMG:
 xattr -cr /Applications/OpenWhisperer.app
 
 If you want to do it on the DMG itself before opening:
-xattr -d com.apple.quarantine ~/Downloads/OpenWhisperer-2.0.0.dmg
+xattr -d com.apple.quarantine ~/Downloads/OpenWhisperer-2.0.1.dmg
 
 
 ## What It Does
@@ -34,6 +34,11 @@ You use your coding agent — **Claude Code, Codex, Antigravity, or Pi** — nor
 Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ## What's New
+
+### 2.0.1
+
+- **Six themes** — Settings → General → **Themes**. **Cream** is the original look and stays the default; **Light** and **Dark** are neutral greyscale; **Pastel**, **Champagne** and **Sky** come from the Authé design system. Settings, the menubar popover and the dictation overlay all follow your choice.
+- **Only Cream follows your Mac's light/dark setting.** Every other theme holds its look whatever macOS is doing — each one says so under the picker.
 
 ### 2.0.0
 
@@ -89,7 +94,7 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ## Install
 
-[**Download OpenWhisperer-2.0.0.dmg**](https://github.com/PerIPan/OpenWhisperer/releases/download/v2.0.0/OpenWhisperer-2.0.0.dmg) — drag to Applications and launch.
+[**Download OpenWhisperer-2.0.1.dmg**](https://github.com/PerIPan/OpenWhisperer/releases/download/v2.0.1/OpenWhisperer-2.0.1.dmg) — drag to Applications and launch.
 
 On first launch, the app:
 - Downloads the Whisper (speech-to-text) and Kokoro (text-to-speech) CoreML models
@@ -118,6 +123,8 @@ Everything else lives in the **Settings** window (⌘,), across five tabs:
 **Agents** — all four agents (Claude Code, Codex CLI, Pi, Antigravity) with their own status and **Connect** button; connect as many as you use. Each has an ⓘ explaining exactly which files get written.
 
 **Advanced** — model status (Whisper STT / TTS engines), the TTS server and port, delete downloaded models, server/events logs, and Copy Diagnostics.
+
+**General** (the logo tab) — version and engine summary, the permissions Open Whisperer needs, **Themes** (Cream · Light · Dark · Pastel · Champagne · Sky), and launch-at-login.
 
 **General** (the logo tab, on the right) — first-run and model-loading progress, launch at login, and the permission list (Accessibility, Microphone, and Speech Recognition in Hands-Free). Each row opens the matching System Settings pane; the logo tab is badged whenever a grant is missing.
 
@@ -261,7 +268,7 @@ chmod +x build-dmg.sh
 ./build-dmg.sh
 ```
 
-This produces `OpenWhisperer.app` and `OpenWhisperer-2.0.0.dmg` in `app/.build/`. Launch the app — on first launch it downloads the Whisper and Kokoro models, then starts the in-app TTS server on `localhost:8000` automatically. (For a plain debug build during development, run `swift build` from `app/`.)
+This produces `OpenWhisperer.app` and `OpenWhisperer-2.0.1.dmg` in `app/.build/`. Launch the app — on first launch it downloads the Whisper and Kokoro models, then starts the in-app TTS server on `localhost:8000` automatically. (For a plain debug build during development, run `swift build` from `app/`.)
 
 ### Step 2: Wire up the hooks
 

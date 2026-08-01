@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import CoreText
+import OpenWhispererKit
 
 // MARK: - Color helpers (warm "Open Whisperer" palette from openwhisperer.com)
 //
@@ -39,36 +40,48 @@ extension Color {
 // Warm "Open Whisperer" palette (openwhisperer.com). Tokens are light/dark dynamic —
 // via the `Color.ow(light, dark)` helper above. Used by the branded menubar popover
 // (the tabbed Settings window) and the transcription overlay.
+/// Live colour tokens for the selected theme.
+///
+/// Every token is a computed `var`, not a `let`: the palette changes at runtime when the user
+/// picks a theme, and a stored constant would freeze the launch-time appearance. `ThemeManager`
+/// publishes the change so SwiftUI re-renders and re-reads these.
 enum OWColor {
+    private static var light: OWPalette { ThemeManager.activePalettes.light }
+    private static var dark: OWPalette { ThemeManager.activePalettes.dark }
+
+    private static func token(_ keyPath: KeyPath<OWPalette, UInt32>) -> Color {
+        .ow(light[keyPath: keyPath], dark[keyPath: keyPath])
+    }
+
     // Surfaces
-    static let page = Color.ow(0xFAF7F1, 0x1E1B16)            // popover / overlay background (cream / warm-dark)
-    static let surface = Color.ow(0xFFFFFF, 0x2A2520)          // card surface
-    static let cardBackground = surface                        // legacy alias (OWCard)
+    static var page: Color { token(\.page) }
+    static var surface: Color { token(\.surface) }
+    static var cardBackground: Color { surface }              // legacy alias (OWCard)
     // Lines
-    static let line = Color.ow(0xDCCFB8, 0x3A332B)             // borders + dividers (deepened for visible cards)
-    static let divider = line                                  // legacy alias
-    // Text ramp (warm ink → cream)
-    static let ink = Color.ow(0x2A2520, 0xF3ECDF)
-    static let inkSoft = Color.ow(0x6A6157, 0xB6AC9C)
-    static let inkFaint = Color.ow(0x978C7E, 0x877D6F)
-    static let muted = inkSoft                                 // legacy alias
-    // Accent (gold)
-    static let accent = Color.ow(0xC0A06A, 0xCBA86A)
-    static let accentDeep = Color.ow(0x98763F, 0xD8B677)
-    static let onAccent = Color.ow(0x2A2520, 0x211B12)         // text/icon on a gold fill (WCAG-safe ink)
-    static let success = accentDeep                            // "applied" state → deep gold (WCAG-safe as text)
+    static var line: Color { token(\.line) }
+    static var divider: Color { line }                        // legacy alias
+    // Text ramp
+    static var ink: Color { token(\.ink) }
+    static var inkSoft: Color { token(\.inkSoft) }
+    static var inkFaint: Color { token(\.inkFaint) }
+    static var muted: Color { inkSoft }                       // legacy alias
+    // Accent
+    static var accent: Color { token(\.accent) }
+    static var accentDeep: Color { token(\.accentDeep) }
+    static var onAccent: Color { token(\.onAccent) }
+    static var success: Color { accentDeep }
     // Fills
-    static let pillFill = Color.ow(0xEADFC8, 0x342D24)
-    static let pickerBg = Color.ow(0xF3EBDD, 0x332C23)
-    static let pickerBorder = Color.ow(0xE0D4BD, 0x423A30)
-    static let checkboxBorder = Color.ow(0xCBBFA9, 0x4A4136)
-    static let pillBackground = pillFill                       // legacy alias
+    static var pillFill: Color { token(\.pillFill) }
+    static var pickerBg: Color { token(\.pickerBg) }
+    static var pickerBorder: Color { token(\.pickerBorder) }
+    static var checkboxBorder: Color { token(\.checkboxBorder) }
+    static var pillBackground: Color { pillFill }             // legacy alias
     // Status semantics — warm equivalents of system red/amber/green so dots + badges don't
-    // clash with the cream/gold palette (the system colors are especially jarring in dark mode).
-    static let recording = Color.ow(0xCC3D33, 0xE2675A)        // recording / error
-    static let warn = Color.ow(0xB8822E, 0xE0B25C)             // transient / warning
-    static let live = Color.ow(0x5E8C4E, 0x86C06A)             // listening / running / ready
-    static let danger = recording                             // alias for error states
+    // clash with the palette (the system colors are especially jarring in dark mode).
+    static var recording: Color { token(\.recording) }
+    static var warn: Color { token(\.warn) }
+    static var live: Color { token(\.live) }
+    static var danger: Color { recording }                    // alias for error states
 }
 
 // MARK: - Bundled font registration
@@ -117,7 +130,8 @@ struct OWWindowBackground: NSViewRepresentable {
     /// menubar dropdown is a system-drawn `NSMenu` that could never be matched anyway.
     private static func apply(to window: NSWindow?) {
         guard let window else { return }
-        window.backgroundColor = .ow(0xFAF7F1, 0x1E1B16)
+        let palettes = ThemeManager.activePalettes
+        window.backgroundColor = .ow(palettes.light.page, palettes.dark.page)
     }
 }
 

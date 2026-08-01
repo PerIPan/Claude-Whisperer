@@ -57,6 +57,8 @@ enum Paths {
 
     /// TTS voice file (tts-hook.sh reads voice name from this)
     static let ttsVoice = appSupport.appendingPathComponent("tts_voice")
+    /// Selected appearance (see `OWTheme`); absent means the default cream.
+    static let uiTheme = appSupport.appendingPathComponent("ui_theme")
 
     /// TTS spoken-summary style/length: terse | normal | rich. Read by
     /// voice-context.sh to shape the nudge; overridable per-project via OW_TTS_STYLE.

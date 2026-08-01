@@ -17,6 +17,20 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
     static let shared = TranscriptionOverlay()
 
     private var window: NSWindow?
+    /// The faceplate tint layer, kept so a theme change can repaint it. `.cgColor` resolves a
+    /// dynamic NSColor immediately, so it cannot update itself.
+    private var tintView: NSView?
+
+    /// Faceplate colour for the active theme, translucent over the HUD blur.
+    private static func faceplateColor() -> NSColor {
+        let palettes = ThemeManager.activePalettes
+        return NSColor.ow(palettes.light.page, palettes.dark.page).withAlphaComponent(0.75)
+    }
+
+    /// Repaint the faceplate after the user picks a different theme.
+    func refreshTheme() {
+        tintView?.layer?.backgroundColor = Self.faceplateColor().cgColor
+    }
 
     @Published var isVisible: Bool = false
     @Published var isTTSPlaying: Bool = false
@@ -194,9 +208,11 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
 
         let tint = NSView()
         tint.wantsLayer = true
-        // Smoked glass: dark instrument face in BOTH appearances (a vintage faceplate
-        // doesn't change color with the room), still translucent over the blur.
-        tint.layer?.backgroundColor = NSColor.ow(0x1E1B16, 0x1E1B16).withAlphaComponent(0.75).cgColor
+        // The faceplate follows the selected theme. It used to be a fixed smoked dark in both
+        // appearances; since themes landed it takes the theme's page colour so the overlay
+        // matches the rest of the app. Still translucent, so the blur behind it reads.
+        tint.layer?.backgroundColor = Self.faceplateColor().cgColor
+        tintView = tint
 
         tint.translatesAutoresizingMaskIntoConstraints = false
         hostingView.translatesAutoresizingMaskIntoConstraints = false
@@ -633,15 +649,23 @@ struct WaveStyleView: View {
     var pttKeyLabel: String = "Ctrl"
     var interactionMode: InteractionMode = .pressToTalk
 
-    private static let waveGradient = LinearGradient(
-        colors: [Color.ow(0xE7CF9E, 0xE7CF9E), OWColor.accent, OWColor.accentDeep],
-        startPoint: .leading, endPoint: .trailing)
-    private static let idleGradient = LinearGradient(
-        colors: [OWColor.inkFaint, OWColor.inkSoft, OWColor.inkFaint],
-        startPoint: .leading, endPoint: .trailing)
-    private static let listeningGradient = LinearGradient(
-        colors: [OWColor.accent, OWColor.accentDeep, OWColor.accent],
-        startPoint: .leading, endPoint: .trailing)
+    // Computed, NOT `static let`. Swift evaluates a `static let` once per process and caches it
+    // forever, which was correct while `OWColor`'s tokens were themselves constants. Now that
+    // they follow the selected theme, a cached gradient would freeze the palette at whichever
+    // theme happened to be active when the overlay first drew — the bars would stay gold after
+    // switching to Dark or Sky, until relaunch.
+    private static var waveGradient: LinearGradient {
+        LinearGradient(colors: [OWColor.accent.opacity(0.55), OWColor.accent, OWColor.accentDeep],
+                       startPoint: .leading, endPoint: .trailing)
+    }
+    private static var idleGradient: LinearGradient {
+        LinearGradient(colors: [OWColor.inkFaint, OWColor.inkSoft, OWColor.inkFaint],
+                       startPoint: .leading, endPoint: .trailing)
+    }
+    private static var listeningGradient: LinearGradient {
+        LinearGradient(colors: [OWColor.accent, OWColor.accentDeep, OWColor.accent],
+                       startPoint: .leading, endPoint: .trailing)
+    }
 
     var body: some View {
         VStack(spacing: 4) {
