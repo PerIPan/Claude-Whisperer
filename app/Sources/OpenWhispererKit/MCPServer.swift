@@ -128,7 +128,12 @@ public struct MCPServer {
         resultResponse(id: id, result: ["content": [["type": "text", "text": message]], "isError": true])
     }
 
-    private static func validVoiceID(_ raw: String?) -> String? {
+    /// Validate a caller-supplied voice id, returning its canonical spelling or nil.
+    ///
+    /// Public because the REST endpoints on `TTSHTTPServer` must apply the same rule — they
+    /// used to take `voice` straight from the JSON body, so the three entry points to the same
+    /// synthesis path disagreed on what a voice id is.
+    public static func validVoiceID(_ raw: String?) -> String? {
         guard let raw else { return nil }
         let voice = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !voice.isEmpty else { return nil }

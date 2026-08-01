@@ -34,9 +34,14 @@ match_and_claim_voice_turn() {
   stored_hash=$(sed -n '1p' "$VOICE_TURN" 2>/dev/null)
   stored_ts=$(sed -n '2p' "$VOICE_TURN" 2>/dev/null)
   [ -z "$stored_hash" ] && { echo 0; return; }
+  # Bash re-evaluates variable contents inside $(( )), so an array subscript in this field
+  # would run command substitution: a voice_turn holding `x[$(...)]` executes it. The file
+  # sits in a 0700 dir and is app-written, so nothing crosses a privilege boundary — but it
+  # is the documented cross-process IPC bus, which makes this an easy sink to forget.
+  case "$stored_ts" in ''|*[!0-9]*) stored_ts=0 ;; esac
   local now
   now=$(date +%s)
-  if [ -n "$stored_ts" ] && [ "$((now - stored_ts))" -gt "$FRESHNESS" ]; then
+  if [ "$stored_ts" -gt 0 ] && [ "$((now - stored_ts))" -gt "$FRESHNESS" ]; then
     rm -f "$VOICE_TURN"
     echo 0
     return

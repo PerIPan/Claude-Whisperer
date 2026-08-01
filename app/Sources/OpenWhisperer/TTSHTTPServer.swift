@@ -49,8 +49,18 @@ final class TTSHTTPServer {
 
     // MARK: - Connection handling
 
+    /// How long a connection may sit without completing a request before it is dropped.
+    /// `while :; do nc localhost 8000 & done` otherwise holds NWConnections and file
+    /// descriptors open indefinitely. Hook requests complete in milliseconds.
+    private static let requestTimeout: TimeInterval = 10
+
     private func accept(_ conn: NWConnection) {
         conn.start(queue: queue)
+        queue.asyncAfter(deadline: .now() + Self.requestTimeout) { [weak conn] in
+            // No-op once the request has been answered — `respond` cancels the connection,
+            // and cancelling an already-cancelled NWConnection is harmless.
+            conn?.cancel()
+        }
         receive(conn, buffer: Data())
     }
 
@@ -80,6 +90,11 @@ final class TTSHTTPServer {
         let method: String
         let path: String
         let body: Data
+        /// Present only when a browser sent the request. Any value at all means the caller is
+        /// a web page, which no legitimate client of this server is.
+        let origin: String?
+        /// Used to reject DNS-rebinding, where a hostile name resolves to 127.0.0.1.
+        let host: String?
     }
 
     /// Parse an HTTP request from `buf`, returning nil if more bytes are still needed.
@@ -90,17 +105,60 @@ final class TTSHTTPServer {
         let request = lines.first?.components(separatedBy: " ") ?? []
         guard request.count >= 2 else { return nil }
 
+        func headerValue(_ name: String) -> String? {
+            // First occurrence wins — a smuggled duplicate must not override the real one.
+            lines.dropFirst().first { $0.lowercased().hasPrefix(name) }
+                .map { String($0.dropFirst(name.count)).trimmingCharacters(in: .whitespaces) }
+        }
+
         var contentLength = 0
         for line in lines.dropFirst() where line.lowercased().hasPrefix("content-length:") {
             contentLength = Int(line.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces)) ?? 0
         }
+        // A negative Content-Length satisfies the `>=` check below and then traps in
+        // `subdata` (lowerBound > upperBound), killing the whole in-process menubar app.
+        // One `nc` packet was enough.
+        guard contentLength >= 0 else { return nil }
         let bodyStart = sep.upperBound
         guard buf.distance(from: bodyStart, to: buf.endIndex) >= contentLength else { return nil }
         let body = buf.subdata(in: bodyStart..<buf.index(bodyStart, offsetBy: contentLength))
-        return Request(method: request[0], path: request[1], body: body)
+        return Request(method: request[0], path: request[1], body: body,
+                       origin: headerValue("origin:"), host: headerValue("host:"))
+    }
+
+    /// Whether the request came from something other than a web page pointed at us.
+    ///
+    /// `POST /mcp` with `Content-Type: text/plain` is a CORS *simple* request — no preflight —
+    /// and `MCPServer` is stateless, so without this any site the user visits could `fetch`
+    /// its way to the `speak` tool and talk through their speakers in their own voice. The MCP
+    /// Streamable HTTP spec requires exactly this check for local servers.
+    ///
+    /// No legitimate client sends `Origin`: not curl, not the bash hooks, not Claude Code's or
+    /// agy's MCP client, not Pi's `fetch` (Node/Bun omit it). A localhost origin is allowed
+    /// anyway so a future local web client isn't locked out for no reason.
+    private static func isTrustedCaller(_ req: Request) -> Bool {
+        if let origin = req.origin?.lowercased(), !origin.isEmpty {
+            let allowed = ["http://localhost", "http://127.0.0.1", "http://[::1]"]
+            guard allowed.contains(where: { origin == $0 || origin.hasPrefix($0 + ":") }) else {
+                return false
+            }
+        }
+        // Rebinding defense: the attacker controls DNS, not the Host header the browser sends.
+        // A missing Host is HTTP/1.0 or a raw socket — not a browser — so it is allowed.
+        if let host = req.host?.lowercased(), !host.isEmpty {
+            let name = host.hasPrefix("[") ? "[::1]" : String(host.split(separator: ":").first ?? "")
+            guard ["localhost", "127.0.0.1", "[::1]"].contains(name) else { return false }
+        }
+        return true
     }
 
     private func route(_ conn: NWConnection, _ req: Request) {
+        guard Self.isTrustedCaller(req) else {
+            respond(conn, "403 Forbidden",
+                    Data(#"{"error":"cross-origin requests are not allowed"}"#.utf8),
+                    contentType: "application/json")
+            return
+        }
         switch (req.method, req.path.split(separator: "?").first.map(String.init) ?? req.path) {
         case ("GET", "/v1/models"):
             let json = #"{"object":"list","data":[{"id":"prince-canuma/Kokoro-82M","object":"model"}]}"#
@@ -109,7 +167,10 @@ final class TTSHTTPServer {
         case ("POST", "/v1/audio/speech"):
             let json = try? JSONSerialization.jsonObject(with: req.body) as? [String: Any]
             let input = json?["input"] as? String ?? ""
-            let voice = json?["voice"] as? String ?? Self.userVoice()
+            // Same validator the MCP `speak` tool uses: an unvalidated id reaches FluidAudio's
+            // voice-pack cache, which keys on the raw string, so `af-heart`/`af.heart`/… each
+            // cache another copy of the same pack.
+            let voice = MCPServer.validVoiceID(json?["voice"] as? String) ?? Self.userVoice()
             // Guard finiteness so a non-finite override can't slip a NaN past clamp into synthesis
             // (JSON can't carry NaN/Inf today, but don't rely on the serializer for that safety).
             let speed = (json?["speed"] as? Double).flatMap { $0.isFinite ? TTSSpeed.clamp(Float($0)) : nil } ?? Self.userSpeed()
@@ -128,7 +189,10 @@ final class TTSHTTPServer {
             // player synthesizes sentence-by-sentence and queues sequential playback.
             let json = try? JSONSerialization.jsonObject(with: req.body) as? [String: Any]
             let input = json?["input"] as? String ?? ""
-            let voice = json?["voice"] as? String ?? Self.userVoice()
+            // Same validator the MCP `speak` tool uses: an unvalidated id reaches FluidAudio's
+            // voice-pack cache, which keys on the raw string, so `af-heart`/`af.heart`/… each
+            // cache another copy of the same pack.
+            let voice = MCPServer.validVoiceID(json?["voice"] as? String) ?? Self.userVoice()
             let speed = (json?["speed"] as? Double).flatMap { $0.isFinite ? TTSSpeed.clamp(Float($0)) : nil } ?? Self.userSpeed()
             Task { [playback] in await playback.play(text: input, voice: voice, speed: speed) }
             respond(conn, "202 Accepted",

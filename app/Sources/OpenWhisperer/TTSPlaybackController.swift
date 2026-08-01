@@ -32,13 +32,35 @@ actor TTSPlaybackController {
         self.tts = tts
     }
 
+    /// Longest single utterance accepted. The 1 MB request cap already lets one call queue
+    /// hours of speech; spoken summaries are a paragraph at most.
+    private static let maxTextLength = 8_000
+    /// Queue depth cap. A caller looping `/v1/audio/play` would otherwise grow this without
+    /// bound. Barge-in clears it, so this only bounds the damage between barge-ins.
+    private static let maxQueueDepth = 32
+
     /// Speak `text`, queueing it for sequential playback.
     func play(text: String, voice: String, speed: Float) {
-        let item = QueueItem(text: text, voice: voice, speed: speed, parentGeneration: generation)
+        guard !text.isEmpty, playQueue.count < Self.maxQueueDepth else { return }
+        let clipped = text.count > Self.maxTextLength
+            ? String(text.prefix(Self.maxTextLength)) : text
+        let item = QueueItem(text: clipped, voice: voice, speed: speed, parentGeneration: generation)
         playQueue.append(item)
         if currentItem == nil {
             startNext()
         }
+    }
+
+    /// Barge in and speak `text` — one actor hop, so it cannot interleave with another caller.
+    ///
+    /// `await bargeIn()` followed by `await play()` is two separate entries: a second preview
+    /// can land its `bargeIn()` between the first's two calls, which re-stamps the first item
+    /// with the *bumped* generation so it passes the staleness guard and plays anyway, and the
+    /// second then queues behind it. Both previews play in sequence instead of the second
+    /// replacing the first. Callers that mean "replace whatever is playing" must use this.
+    func replaceNow(text: String, voice: String, speed: Float) {
+        bargeIn()
+        play(text: text, voice: voice, speed: speed)
     }
 
     private func startNext() {

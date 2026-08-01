@@ -154,13 +154,11 @@ struct VoiceTab: View {
     private func preview() {
         let voice = selectedVoice
         let speed = Float(selectedSpeed)
-        // `TTSPlaybackController` is an actor precisely so the ANE work stays serialized —
-        // calling its methods synchronously from the main actor would run them on this
-        // thread alongside the actor's own in-flight synthesis task, racing the state it
-        // exists to protect. Hop onto the actor like every other call site does.
+        // One actor hop, not two: `bargeIn()` then `play()` as separate awaits lets a second
+        // click interleave between them, and both previews end up playing in sequence
+        // instead of the second replacing the first.
         Task {
-            await serverManager.playback.bargeIn()
-            await serverManager.playback.play(
+            await serverManager.playback.replaceNow(
                 text: TTSSampleText.sample(forVoiceID: voice), voice: voice, speed: speed)
         }
     }
