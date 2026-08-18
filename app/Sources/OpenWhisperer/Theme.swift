@@ -141,24 +141,41 @@ struct OWWindowBackground: NSViewRepresentable {
 // MARK: - Brand fonts
 
 enum OWFont {
+    /// Global type scale, applied inside every helper below so all ~90 call sites move
+    /// together — most pass an explicit size, so scaling here is the only single point that
+    /// reaches them.
+    ///
+    /// The windows had settled on 10–13pt against macOS's 13pt body default, which read as
+    /// cramped in windows that had space to spare. This is the one number to turn if it
+    /// wants to be more or less; nothing else needs touching.
+    ///
+    /// Scope note: the transcription overlay and the menubar draw their own text and use no
+    /// `OWFont`, so this deliberately does not touch the one surface that is always on
+    /// screen and most size-sensitive.
+    static let scale: CGFloat = 1.2
+
+    /// Rounded to a whole point: fractional sizes make the bundled faces hint inconsistently
+    /// between adjacent labels, which is more visible than the extra fidelity is worth.
+    private static func scaled(_ size: CGFloat) -> CGFloat { (size * scale).rounded() }
+
     /// Brand serif for the wordmark + titled headers. The bundled cut is a single SemiBold static
     /// face (family "Fraunces SemiBold"), so the weight is intrinsic — no `.weight()` needed.
     static func title(_ size: CGFloat = 15) -> Font {
-        .custom("Fraunces SemiBold", size: size)
+        .custom("Fraunces SemiBold", size: scaled(size))
     }
     static func serif(_ size: CGFloat = 15) -> Font {
-        .custom("Fraunces SemiBold", size: size)
+        .custom("Fraunces SemiBold", size: scaled(size))
     }
     static func sectionLabel(_ size: CGFloat = 11) -> Font {
-        .custom("Outfit", size: size).weight(.semibold)
+        .custom("Outfit", size: scaled(size)).weight(.semibold)
     }
     static func body(_ size: CGFloat = 13) -> Font {
-        .custom("Outfit", size: size)
+        .custom("Outfit", size: scaled(size))
     }
     static func caption(_ size: CGFloat = 10) -> Font {
-        .custom("Outfit", size: size)
+        .custom("Outfit", size: scaled(size))
     }
     static func mono(_ size: CGFloat = 11) -> Font {
-        .custom("Outfit", size: size).monospaced()
+        .custom("Outfit", size: scaled(size)).monospaced()
     }
 }

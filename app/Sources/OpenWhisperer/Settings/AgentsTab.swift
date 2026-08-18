@@ -85,7 +85,7 @@ struct AgentsTab: View {
 
             Button(isConnected ? "Reconnect" : "Connect") { connect(platform) }
                 .buttonStyle(OWRowButtonStyle(tinted: isConnected, urgent: !isConnected))
-                .frame(width: 92)
+                .frame(width: 104)
         }
     }
 

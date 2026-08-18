@@ -59,7 +59,7 @@ struct FirstRunDictatePane: View {
     var body: some View {
         OWCard {
             VStack(alignment: .leading, spacing: 10) {
-                OWPickerRow(label: "Mode", labelWidth: 66) {
+                OWPickerRow(label: "Mode", labelWidth: 78) {
                     OWMenuPicker(selection: $selectedMode,
                                  options: InteractionMode.allCases.map { (id: $0, label: $0.label) })
                         .frame(maxWidth: .infinity)
@@ -76,7 +76,7 @@ struct FirstRunDictatePane: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if selectedMode != .handsFree {
-                    OWPickerRow(label: "Hold key", labelWidth: 66) {
+                    OWPickerRow(label: "Hold key", labelWidth: 78) {
                         OWMenuPicker(selection: $selectedPTTKey,
                                      options: PTTKey.allCases.map { (id: $0.rawValue, label: $0.label) })
                             .frame(maxWidth: .infinity)
@@ -91,7 +91,7 @@ struct FirstRunDictatePane: View {
 
                 OWInternalDivider()
 
-                OWPickerRow(label: "Language", labelWidth: 66) {
+                OWPickerRow(label: "Language", labelWidth: 78) {
                     OWSearchablePicker(
                         selection: $selectedLanguage,
                         sections: SettingsData.languageSections,
@@ -148,7 +148,7 @@ struct FirstRunVoicePane: View {
     var body: some View {
         OWCard {
             VStack(alignment: .leading, spacing: 10) {
-                OWPickerRow(label: "Voice", labelWidth: 66) {
+                OWPickerRow(label: "Voice", labelWidth: 78) {
                     HStack(spacing: 6) {
                         OWSearchablePicker(
                             selection: $selectedVoice,
@@ -196,7 +196,7 @@ struct FirstRunVoicePane: View {
 
                 OWInternalDivider()
 
-                OWPickerRow(label: "Length", labelWidth: 66) {
+                OWPickerRow(label: "Length", labelWidth: 78) {
                     OWMenuPicker(selection: $selectedStyle, options: SettingsData.styleLevels)
                         .frame(maxWidth: .infinity)
                 }
@@ -320,7 +320,7 @@ struct FirstRunAgentPane: View {
 
             Button(isConnected ? "Reconnect" : "Connect") { connect(platform) }
                 .buttonStyle(OWRowButtonStyle(tinted: isConnected, urgent: !isConnected && isPresent))
-                .frame(width: 92)
+                .frame(width: 104)
         }
     }
 
