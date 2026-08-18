@@ -68,23 +68,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if setupManager.isSetupComplete {
             serverManager.startAll()
         } else {
-            // First run: the menubar is only a small dropdown now, so nothing would
-            // surface the setup/model progress on its own. Open Settings on General
-            // (which hosts those banners) so the user sees what's happening.
+            // First run: show the setup sheet rather than dropping the user into Settings
+            // with an InstructionWindow of JSON over it. The sheet owns permissions,
+            // dictate, voice and agent setup, and carries model-download status in its
+            // chrome — which is what Settings → General was standing in for.
+            //
+            // The completion marker is written when the sheet closes (Done, Skip, or the
+            // title-bar button), not before it opens: a marker written up front would mean
+            // a crash mid-setup silently skips first run forever.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 guard let self else { return }
-                SettingsWindow.show(tab: .general, appDelegate: self)
-            }
-            setupManager.runFirstLaunchSetup { [weak self] success in
-                guard success else { return }
-                // startAll must run on main thread (BUG-11: timer + process management)
-                DispatchQueue.main.async {
-                    self?.serverManager.startAll()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                        ConfigManager.showHookInstructions(for: Platform.load())
-                    }
+                FirstRunWindow.show(appDelegate: self) { [weak self] in
+                    self?.setupManager.runFirstLaunchSetup { _ in }
                 }
             }
+            // The server still starts immediately — setup is not a gate, and a user who
+            // skips straight past the sheet should find a working app behind it.
+            serverManager.startAll()
         }
     }
 
