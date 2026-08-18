@@ -121,9 +121,14 @@ struct FirstRunDictatePane: View {
             let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
             if PTTKey(rawValue: trimmed) != nil { selectedPTTKey = trimmed }
         }
+        // Membership-checked like `DictationTab.load()`: an unrecognized code from a stale
+        // `stt_language` would otherwise show as a raw string in the picker's label instead
+        // of falling back to the default.
         if let lang = try? String(contentsOf: Paths.sttLanguage, encoding: .utf8) {
             let trimmed = lang.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty { selectedLanguage = trimmed }
+            if SettingsData.languages.contains(where: { $0.id == trimmed }) {
+                selectedLanguage = trimmed
+            }
         }
     }
 }
