@@ -84,7 +84,7 @@ struct VoiceTab: View {
                     // French voice with a Japanese persona is coherent rather than a
                     // contradiction. For a Supertonic voice this is the only way to get any
                     // persona at all, since resolve_flavor() reaches none automatically (#39).
-                    OWPickerRow(label: "Persona", labelWidth: 62) {
+                    OWPickerRow(label: "Persona", labelWidth: 74) {
                         OWMenuPicker(selection: $selectedPersona,
                                      options: SettingsData.personaOptions(for: selectedVoice))
                             .frame(maxWidth: .infinity)

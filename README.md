@@ -24,7 +24,7 @@ The command to bypass Gatekeeper for the DMG:
 xattr -cr /Applications/OpenWhisperer.app
 
 If you want to do it on the DMG itself before opening:
-xattr -d com.apple.quarantine ~/Downloads/OpenWhisperer-2.0.1.dmg
+xattr -d com.apple.quarantine ~/Downloads/OpenWhisperer-2.0.3.dmg
 
 
 ## What It Does
@@ -34,6 +34,13 @@ You use your coding agent — **Claude Code, Codex, Antigravity, or Pi** — nor
 Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ## What's New
+
+### 2.0.3
+
+- **First-run setup** — a four-pane sheet on first launch: permissions, dictation, voice, and connecting your coding agent. It replaces being dropped into Settings with a wall of JSON over it, and carries model-download progress the whole way through. Skippable at every step, and reopenable any time from the menubar → **Setup…**.
+- **Personas are no longer a secret.** Choosing a voice has always attached a national character to every spoken reply — French dry and faintly unimpressed, Hindi irrepressibly helpful — and nothing in the app ever said so. The voice picker now names each language group's persona, and the selected one is spelled out under the picker.
+- **Pick a persona yourself** — Settings → Voice → **Persona**. Defaults to **Automatic**, which is the voice's own character, so nothing changes unless you change it. Multilingual (Supertonic) voices get no persona automatically; selecting one here is currently the only way to give them any.
+- **Larger type** throughout the windows. The overlay is untouched.
 
 ### 2.0.1
 
@@ -94,7 +101,7 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ## Install
 
-[**Download OpenWhisperer-2.0.1.dmg**](https://github.com/PerIPan/OpenWhisperer/releases/download/v2.0.1/OpenWhisperer-2.0.1.dmg) — drag to Applications and launch.
+[**Download OpenWhisperer-2.0.3.dmg**](https://github.com/PerIPan/OpenWhisperer/releases/download/v2.0.3/OpenWhisperer-2.0.3.dmg) — drag to Applications and launch.
 
 On first launch, the app:
 - Downloads the Whisper (speech-to-text) and Kokoro (text-to-speech) CoreML models
@@ -219,6 +226,7 @@ Most settings are configured in the Settings window (voice, volume, language, ho
 | `OW_TTS_STYLE` | Settings → Voice → **Length** | hooks | Per-project spoken-summary length (`terse`/`normal`/`rich`/`full`); overrides the global `tts_style` |
 | `OW_TTS_VOICE` | menubar voice | hooks | Per-project voice id, Kokoro or `supertonic:<lang>:<style>` (any of its 31 languages — the picker shows the 24 Kokoro can't speak); overrides the global `tts_voice` |
 | `OW_TTS_RESPONSE` | menubar **Response** | hooks | Per-project response mode (`voice`/`always`/`needed`); overrides the global `tts_response_mode` |
+| `OW_TTS_PERSONA` | Settings → Voice → **Persona** | hooks | Per-project persona (`auto`, or an id such as `british`/`japanese`/`dutch`); overrides the global `tts_persona`. An unrecognized value falls back to the voice's own persona rather than removing it |
 
 > **Tip:** A specific language beats auto-detect. It prevents the model hallucinating text in other languages during silence or background noise, skips a decoding pass, and is more reliable on short phrases — which is most of what dictation produces. English is the default for exactly this reason; change it in Settings → Dictate if you dictate in something else.
 
@@ -266,7 +274,7 @@ chmod +x build-dmg.sh
 ./build-dmg.sh
 ```
 
-This produces `OpenWhisperer.app` and `OpenWhisperer-2.0.1.dmg` in `app/.build/`. Launch the app — on first launch it downloads the Whisper and Kokoro models, then starts the in-app TTS server on `localhost:8000` automatically. (For a plain debug build during development, run `swift build` from `app/`.)
+This produces `OpenWhisperer.app` and `OpenWhisperer-2.0.3.dmg` in `app/.build/`. Launch the app — on first launch it downloads the Whisper and Kokoro models, then starts the in-app TTS server on `localhost:8000` automatically. (For a plain debug build during development, run `swift build` from `app/`.)
 
 ### Step 2: Wire up the hooks
 
@@ -312,6 +320,8 @@ OpenWhisperer/
     ├── Package.swift
     ├── Sources/
     │   ├── OpenWhisperer/     # App + native STT (WhisperKit) + native TTS (Kokoro, Supertonic-3)
+    │   │   ├── FirstRun/       # First-launch setup sheet
+    │   │   └── Settings/       # Settings window tabs
     │   └── OpenWhispererKit/  # Pure, unit-tested logic
     ├── Tests/
     ├── Resources/
