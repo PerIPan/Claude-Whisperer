@@ -89,6 +89,10 @@ enum Paths {
     /// Silence threshold for hands-free mode (seconds, default 3)
     static let silenceThreshold = appSupport.appendingPathComponent("silence_threshold")
 
+    /// Persona override (`auto` = follow the voice, else a `VoicePersona` id). Read by
+    /// `resolve_flavor()` in voice-shared.sh; `OW_TTS_PERSONA` overrides it per project.
+    static let ttsPersona = appSupport.appendingPathComponent("tts_persona")
+
     /// TTS volume file (tts-hook.sh reads volume level from this)
     static let ttsVolume = appSupport.appendingPathComponent("tts_volume")
 

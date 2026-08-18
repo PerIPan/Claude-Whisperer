@@ -100,5 +100,59 @@ func voicePersonaFailures() -> [String] {
     check("summary capitalises the article", VoicePersona.summary(for: "bm_george")?.hasPrefix("A British") == true)
     check("no summary without a persona", VoicePersona.summary(for: "supertonic:nl:F1") == nil)
 
+    // --- Override resolution -------------------------------------------------------
+
+    // Automatic: absent, empty, and the explicit sentinel must all mean "follow the voice".
+    check("nil override follows the voice",
+          VoicePersona.resolve(voiceID: "af_heart", override: nil)?.id == "american")
+    check("empty override follows the voice",
+          VoicePersona.resolve(voiceID: "af_heart", override: "")?.id == "american")
+    check("auto follows the voice",
+          VoicePersona.resolve(voiceID: "af_heart", override: "auto")?.id == "american")
+
+    // A valid override wins, including a cross-pairing the automatic path could never make.
+    check("override wins over the voice",
+          VoicePersona.resolve(voiceID: "ff_siwis", override: "japanese")?.id == "japanese")
+    check("override reaches an override-only persona",
+          VoicePersona.resolve(voiceID: "supertonic:nl:F1", override: "dutch")?.id == "dutch")
+    check("override is case-insensitive",
+          VoicePersona.resolve(voiceID: "af_heart", override: "  BRITISH ")?.id == "british")
+
+    // Unrecognized degrades to the voice rather than going silent — matching the hook, so a
+    // typo or a pref from a newer build cannot strip the persona entirely.
+    check("unknown override falls back to the voice",
+          VoicePersona.resolve(voiceID: "af_heart", override: "nonsense")?.id == "american")
+    check("unknown override on a personaless voice stays nil",
+          VoicePersona.resolve(voiceID: "supertonic:nl:F1", override: "nonsense") == nil)
+    check("automatic on a Supertonic voice stays nil",
+          VoicePersona.resolve(voiceID: "supertonic:nl:F1", override: "auto") == nil)
+
+    // Every persona is addressable by id; only the nine Kokoro ones by prefix.
+    for persona in VoicePersona.all {
+        check("\(persona.id) resolves by id", VoicePersona.forID(persona.id)?.id == persona.id)
+    }
+    check("nine personas are automatic", VoicePersona.automaticPersonas.count == 9)
+    check("override-only personas have no prefix",
+          VoicePersona.overrideOnlyPersonas.allSatisfy { $0.prefix == nil })
+    check("automatic and override-only partition the set",
+          VoicePersona.automaticPersonas.count + VoicePersona.overrideOnlyPersonas.count
+              == VoicePersona.all.count)
+    check("ids are unique", Set(VoicePersona.all.map(\.id)).count == VoicePersona.all.count)
+
+    // The caption must say when the persona is *not* the voice's own, or it would describe
+    // a character while implying the voice picked it.
+    if let overridden = VoicePersona.disclosure(voiceID: "ff_siwis", override: "japanese") {
+        check("overridden disclosure names the chosen persona", overridden.contains("Japanese"))
+        check("overridden disclosure says it was chosen", overridden.contains("chosen over the voice"))
+    } else {
+        failures.append("VoicePersona: overridden disclosure was nil")
+    }
+    if let automatic = VoicePersona.disclosure(voiceID: "ff_siwis", override: "auto") {
+        check("automatic disclosure does not claim an override",
+              !automatic.contains("chosen over the voice"))
+    } else {
+        failures.append("VoicePersona: automatic disclosure was nil")
+    }
+
     return failures
 }
