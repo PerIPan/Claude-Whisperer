@@ -1,4 +1,5 @@
 import SwiftUI
+import OpenWhispererKit
 
 /// Which coding agents can speak. All four are listed with their own status and
 /// Connect button — you can run several agents, so a single-select picker misled.
@@ -8,6 +9,10 @@ struct AgentsTab: View {
     /// Result of the most recent connect, kept until the next one (failures must not
     /// vanish on a timer).
     @State private var lastResult: (platform: Platform, ok: Bool, message: String)?
+    /// Mirrors the stored voice so "Automatic" can name what it resolves to. Reloaded on
+    /// appear, since the voice is changed on a different tab.
+    @State private var selectedVoice = "af_heart"
+    @State private var selectedPersona = VoicePersona.automatic
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -20,6 +25,43 @@ struct AgentsTab: View {
                         if index > 0 { OWInternalDivider() }
                         agentRow(platform)
                     }
+                }
+            }
+
+            // Persona sits with the agents, not with the voice: it is an instruction to the
+            // model about the words it writes, and never reaches the synthesiser. Its own
+            // card because it is not per-agent — the hooks never read `selected_platform`,
+            // so one persona applies to every connected agent. Per-*project* variation is
+            // the only axis there is, via OW_TTS_PERSONA.
+            OWCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    OWCardHeader(title: "Persona", icon: "theatermasks",
+                                 help: "A light national character the model is told to adopt when it writes a spoken reply. Tone only — it never changes what gets done, and never changes how the voice sounds. Applies to every connected agent; override per project with OW_TTS_PERSONA.")
+
+                    OWPickerRow(label: "Persona", labelWidth: 74) {
+                        OWMenuPicker(selection: $selectedPersona,
+                                     options: SettingsData.personaOptions(for: selectedVoice))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .onChange(of: selectedPersona) { _, newValue in
+                        try? newValue.write(to: Paths.ttsPersona, atomically: true, encoding: .utf8)
+                    }
+
+                    if let line = VoicePersona.disclosure(voiceID: selectedVoice,
+                                                          override: selectedPersona) {
+                        Text(line)
+                            .font(OWFont.caption())
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    // The voice lives on another tab, so name the one Automatic is following
+                    // — otherwise "Automatic (American)" is a claim with no visible source.
+                    Text("Following \(SettingsData.voiceLabel(selectedVoice)), set in Settings → Voice.")
+                        .font(OWFont.caption())
+                        .foregroundColor(OWColor.inkFaint)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -47,7 +89,10 @@ struct AgentsTab: View {
                 }
             }
         }
-        .onAppear(perform: refreshAll)
+        .onAppear {
+            refreshAll()
+            loadPersona()
+        }
     }
 
     private func agentRow(_ platform: Platform) -> some View {
@@ -87,6 +132,27 @@ struct AgentsTab: View {
                 .buttonStyle(OWRowButtonStyle(tinted: isConnected, urgent: !isConnected))
                 .frame(width: 104)
         }
+    }
+
+    /// Re-read on every appear: the voice is chosen on another tab, and changing it can
+    /// retire the Supertonic-only personas this picker was offering.
+    private func loadPersona() {
+        if let saved = try? String(contentsOf: Paths.ttsVoice, encoding: .utf8) {
+            let voice = saved.trimmingCharacters(in: .whitespacesAndNewlines)
+            if SettingsData.allVoices.contains(where: { $0.id == voice }) { selectedVoice = voice }
+        }
+        var persona = VoicePersona.automatic
+        if let saved = try? String(contentsOf: Paths.ttsPersona, encoding: .utf8) {
+            let stored = saved.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if stored == VoicePersona.automatic || VoicePersona.forID(stored) != nil { persona = stored }
+        }
+        // A persona no longer offered for this voice falls back rather than sitting in the
+        // picker with no matching row while the hook goes on applying it.
+        if !SettingsData.personaOptions(for: selectedVoice).contains(where: { $0.id == persona }) {
+            persona = VoicePersona.automatic
+            try? persona.write(to: Paths.ttsPersona, atomically: true, encoding: .utf8)
+        }
+        selectedPersona = persona
     }
 
     private func connect(_ platform: Platform) {

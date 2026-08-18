@@ -12,7 +12,6 @@ struct VoiceTab: View {
     @State private var selectedSpeed: Double = Double(TTSSpeed.default)
     @State private var selectedVolume: Double = 1.0
     @State private var selectedStyle = "normal"
-    @State private var selectedPersona = VoicePersona.automatic
     @State private var selectedResponse = "voice"
     /// Held in state, not recomputed per redraw: each row's badge stats the filesystem,
     /// and `body` runs far more often than the cache changes.
@@ -54,14 +53,7 @@ struct VoiceTab: View {
                         // Cache state changes as soon as a preview or reply downloads a
                         // pack, and the section list bakes it into each row's badge.
                         voiceSections = SettingsData.voiceSections
-                        // Leaving a Supertonic voice retires the override-only personas, so
-                        // a selection no longer offered falls back rather than persisting
-                        // invisibly — the picker would show a blank label while the hook
-                        // went on applying it.
-                        if !SettingsData.personaOptions(for: newValue).contains(where: { $0.id == selectedPersona }) {
-                            selectedPersona = VoicePersona.automatic
                         }
-                    }
 
                     // The genuinely surprising half of picking a non-English voice: the
                     // model is told to write the spoken text in that language too
@@ -74,34 +66,10 @@ struct VoiceTab: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    // The other half of the same surprise, and the bigger one: a Kokoro voice
-                    // also attaches a national persona to every spoken reply (resolve_flavor
-                    // in voice-shared.sh) — ungated, every turn. Nothing disclosed it before.
-                    // Mutually exclusive with the line above: Supertonic voices get a reply
-                    // language instead of a persona, so exactly one of the two ever shows.
-                    // Persona defaults to the voice's own ("Automatic") but is its own axis:
-                    // the nudge already names accent and character in separate clauses, so a
-                    // French voice with a Japanese persona is coherent rather than a
-                    // contradiction. For a Supertonic voice this is the only way to get any
-                    // persona at all, since resolve_flavor() reaches none automatically (#39).
-                    OWPickerRow(label: "Persona", labelWidth: 74) {
-                        OWMenuPicker(selection: $selectedPersona,
-                                     options: SettingsData.personaOptions(for: selectedVoice))
-                            .frame(maxWidth: .infinity)
-                    }
-                    .onChange(of: selectedPersona) { _, newValue in
-                        try? newValue.write(to: Paths.ttsPersona, atomically: true, encoding: .utf8)
-                    }
-
-                    if let persona = VoicePersona.disclosure(voiceID: selectedVoice,
-                                                             override: selectedPersona) {
-                        Text(persona)
-                            .font(OWFont.caption())
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
+                    // The persona a voice carries lives on the Agents tab, not here: it
+                    // instructs the model about the words it writes, not the synthesiser
+                    // about how they sound. The picker's group headers still name each
+                    // language's persona, so the choice is informed from this side too.
                     OWInternalDivider()
 
                     OWPickerRow(label: "Speed", labelWidth: 74) {
@@ -207,14 +175,6 @@ struct VoiceTab: View {
            !savedVoice.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let voice = savedVoice.trimmingCharacters(in: .whitespacesAndNewlines)
             if SettingsData.allVoices.contains(where: { $0.id == voice }) { selectedVoice = voice }
-        }
-        if let savedPersona = try? String(contentsOf: Paths.ttsPersona, encoding: .utf8) {
-            let persona = savedPersona.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            // Accept only what this build knows, so a persona written by a newer build
-            // cannot leave the picker showing a value it has no row for.
-            if persona == VoicePersona.automatic || VoicePersona.forID(persona) != nil {
-                selectedPersona = persona
-            }
         }
         if let savedStyle = try? String(contentsOf: Paths.ttsStyle, encoding: .utf8) {
             let style = savedStyle.trimmingCharacters(in: .whitespacesAndNewlines)
