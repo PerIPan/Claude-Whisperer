@@ -58,7 +58,7 @@ struct FirstRunView: View {
             Divider().overlay(OWColor.divider)
             footer
         }
-        .frame(width: 470)
+        .frame(width: 520)
         .background(OWColor.page)
     }
 
@@ -164,7 +164,7 @@ struct FirstRunView: View {
                     if let p = selection.pane.previous { selection.pane = p }
                 }
                 .buttonStyle(OWRowButtonStyle())
-                .frame(width: 76)
+                .frame(width: 90)
             }
             Spacer()
             Button(selection.pane.isLast ? "Done" : "Next") {
@@ -175,7 +175,7 @@ struct FirstRunView: View {
                 }
             }
             .buttonStyle(OWPrimaryButtonStyle())
-            .frame(width: 96)
+            .frame(width: 110)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)

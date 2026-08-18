@@ -33,7 +33,7 @@ struct OWTabBar: View {
                 OWTabButton(tab: logoTab,
                             isSelected: selection == logoTab,
                             needsAttention: needsAttention) { selection = logoTab }
-                    .frame(width: 54)
+                    .frame(width: 64)
             }
         }
         .frame(maxWidth: .infinity)

@@ -89,7 +89,7 @@ struct GeneralTab: View {
                                  + "identity and the only theme that follows your system's "
                                  + "light/dark setting; the rest hold their look either way.")
 
-                OWPickerRow(label: "Theme", labelWidth: 62) {
+                OWPickerRow(label: "Theme", labelWidth: 74) {
                     OWMenuPicker(
                         selection: Binding(
                             get: { themeManager.theme.rawValue },

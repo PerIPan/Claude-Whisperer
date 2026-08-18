@@ -24,7 +24,7 @@ struct VoiceTab: View {
                     OWCardHeader(title: "Sound", icon: "speaker.wave.2.fill",
                                  help: "The voice that reads replies aloud, and how fast and loud it speaks. Non-default voices download on first use.")
 
-                    OWPickerRow(label: "Voice", labelWidth: 62) {
+                    OWPickerRow(label: "Voice", labelWidth: 74) {
                         HStack(spacing: 6) {
                             OWSearchablePicker(
                                 selection: $selectedVoice,
@@ -81,7 +81,7 @@ struct VoiceTab: View {
 
                     OWInternalDivider()
 
-                    OWPickerRow(label: "Speed", labelWidth: 62) {
+                    OWPickerRow(label: "Speed", labelWidth: 74) {
                         HStack(spacing: 8) {
                             // Bounds MUST equal TTSSpeed.min/max (see TTSSpeed.swift).
                             // Writes once on release, not on every 0.05 step.
@@ -94,12 +94,12 @@ struct VoiceTab: View {
                                 .font(OWFont.body(11))
                                 .foregroundColor(OWColor.inkSoft)
                                 .monospacedDigit()
-                                .frame(width: 34, alignment: .trailing)
+                                .frame(width: 40, alignment: .trailing)
                         }
                         .frame(maxWidth: .infinity)
                     }
 
-                    OWPickerRow(label: "Volume", labelWidth: 62) {
+                    OWPickerRow(label: "Volume", labelWidth: 74) {
                         HStack(spacing: 8) {
                             // Bounds MUST equal TTSVolume.min/max (see TTSVolume.swift).
                             OWSlider(value: $selectedVolume, range: 0.3...2.0) {
@@ -111,7 +111,7 @@ struct VoiceTab: View {
                                 .font(OWFont.body(11))
                                 .foregroundColor(OWColor.inkSoft)
                                 .monospacedDigit()
-                                .frame(width: 34, alignment: .trailing)
+                                .frame(width: 40, alignment: .trailing)
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -135,7 +135,7 @@ struct VoiceTab: View {
                                  simply succeeded.
                                  """)
 
-                    OWPickerRow(label: "Length", labelWidth: 62) {
+                    OWPickerRow(label: "Length", labelWidth: 74) {
                         OWMenuPicker(selection: $selectedStyle, options: SettingsData.styleLevels)
                             .frame(maxWidth: .infinity)
                     }
@@ -144,7 +144,7 @@ struct VoiceTab: View {
                     }
 
                     // Self-describing options — the explanatory caption is no longer needed.
-                    OWPickerRow(label: "Speak", labelWidth: 62) {
+                    OWPickerRow(label: "Speak", labelWidth: 74) {
                         OWMenuPicker(selection: $selectedResponse, options: SettingsData.responseModes)
                             .frame(maxWidth: .infinity)
                     }

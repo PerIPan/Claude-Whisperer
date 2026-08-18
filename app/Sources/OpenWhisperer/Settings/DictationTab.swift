@@ -45,7 +45,7 @@ struct DictationTab: View {
                 OWCardHeader(title: "How you talk", icon: "mic.fill",
                              help: "How you start dictation — Press-to-Talk, Hold-to-Talk, or Hands-Free — plus the trigger key and how the app listens.")
 
-                OWPickerRow(label: "Mode", labelWidth: 62) {
+                OWPickerRow(label: "Mode", labelWidth: 74) {
                     OWMenuPicker(selection: $selectedMode,
                                  options: InteractionMode.allCases.map { (id: $0, label: $0.label) })
                         .frame(maxWidth: .infinity)
@@ -88,7 +88,7 @@ struct DictationTab: View {
                         if selectedMode != .handsFree {
                             OWMenuPicker(selection: $selectedPTTKey,
                                          options: PTTKey.allCases.map { (id: $0.rawValue, label: $0.label) })
-                                .frame(width: 76)
+                                .frame(width: 90)
                         }
                     }
                     .onChange(of: selectedPTTKey) { _, newValue in
@@ -109,7 +109,7 @@ struct DictationTab: View {
                             Spacer()
                             OWMenuPicker(selection: $silenceThreshold,
                                          options: [3, 4, 5, 7, 10, 20].map { (id: $0, label: "\($0)s") })
-                                .frame(width: 76)
+                                .frame(width: 90)
                                 .onChange(of: silenceThreshold) { _, newValue in
                                     try? String(newValue).write(to: Paths.silenceThreshold, atomically: true, encoding: .utf8)
                                     dictationManager.recorder.silenceThresholdSeconds = TimeInterval(newValue)
@@ -173,7 +173,7 @@ struct DictationTab: View {
                             (id: OverlayStyle.curtain.rawValue, label: "Curtain"),
                         ]
                     )
-                    .frame(width: 96)
+                    .frame(width: 110)
                 }
 
                 if pttKeyChanged {
@@ -194,7 +194,7 @@ struct DictationTab: View {
                 OWCardHeader(title: "Language & vocabulary", icon: "character.book.closed",
                              help: "The language you dictate in, and a glossary of your own terms that transcripts are fuzzy-corrected against.")
 
-                OWPickerRow(label: "Language", labelWidth: 62) {
+                OWPickerRow(label: "Language", labelWidth: 74) {
                     OWSearchablePicker(
                         selection: $selectedLanguage,
                         sections: SettingsData.languageSections,
