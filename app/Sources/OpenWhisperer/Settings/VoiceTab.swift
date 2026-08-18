@@ -46,7 +46,7 @@ struct VoiceTab: View {
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .help("Hear this voice read a sample in its own language.")
+                            .help("Hear this voice read a fixed sample in its own language. It previews the voice, not the persona — a persona changes the words the model writes, not how the voice sounds.")
                         }
                     }
                     .onChange(of: selectedVoice) { _, newValue in
