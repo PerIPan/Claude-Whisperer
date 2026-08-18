@@ -2,7 +2,7 @@ import Foundation
 import OpenWhispererKit
 
 /// Cross-target parity: `VoicePersona.byPrefix` must match `resolve_flavor()`'s case arms
-/// exactly — same prefixes, same accent, same persona name, same descriptor.
+/// exactly — same keys, same accent, same persona name, same descriptor.
 ///
 /// The failure this prevents is a disclosure that lies. Settings tells the user their voice
 /// makes replies "dry and unflappable"; the hook is what actually tells the model. Reword one
@@ -31,30 +31,46 @@ func voicePersonaParityFailures() -> [String] {
 
     // Arms look like:  a) accent="American English";  persona="American";  desc="…" ;;
     // Parsing the hook rather than restating it keeps this a parity check, not a third copy.
-    var hookPersonas: [Character: VoicePersona.Persona] = [:]
-    let pattern = #"\b([a-z])\)\s*accent="([^"]+)"\s*;\s*persona="([^"]+)"\s*;\s*desc="([^"]+)""#
-    let regex = try! NSRegularExpression(pattern: pattern)
+    //
+    // The label is matched as `[a-z]{1,3}` with optional `|` alternates rather than a single
+    // character, because issue #39 proposes keying Supertonic voices by language code
+    // (`nl)`, `a|en)`). A single-character pattern still parses today's arms, so a *mixed*
+    // map — single-char arms kept, `nl)` added — would parse clean while silently ignoring
+    // the new ones, which is this check's own failure mode reappearing as a false pass.
+    var hookPersonas: [String: VoicePersona.Persona] = [:]
+    let pattern = #"(?:^|[\s;])([a-z]{1,3}(?:\|[a-z]{1,3})*)\)\s*accent="([^"]+)"\s*;\s*persona="([^"]+)"\s*;\s*desc="([^"]+)""#
+    let regex = try! NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
     let range = NSRange(body.startIndex..., in: body)
     for match in regex.matches(in: body, range: range) {
-        guard let prefixRange = Range(match.range(at: 1), in: body),
+        guard let labelRange = Range(match.range(at: 1), in: body),
               let accentRange = Range(match.range(at: 2), in: body),
               let nameRange = Range(match.range(at: 3), in: body),
-              let descRange = Range(match.range(at: 4), in: body),
-              let prefix = String(body[prefixRange]).first else { continue }
-        hookPersonas[prefix] = VoicePersona.Persona(
+              let descRange = Range(match.range(at: 4), in: body) else { continue }
+        let persona = VoicePersona.Persona(
             accent: String(body[accentRange]),
             name: String(body[nameRange]),
             descriptor: String(body[descRange]))
+        // `a|en)` registers both aliases against the same persona.
+        for key in String(body[labelRange]).split(separator: "|") {
+            hookPersonas[String(key)] = persona
+        }
     }
 
     if hookPersonas.isEmpty {
         return ["voice-shared.sh: resolve_flavor's case arms did not parse — did the map's shape change?"]
     }
 
-    // Both directions: a prefix only in Swift is a disclosure for a persona the model never
+    // Both directions: a key only in Swift is a disclosure for a persona the model never
     // gets, and one only in the hook is a persona applied with nothing said about it — the
     // very gap this type was added to close.
-    for (prefix, hookPersona) in hookPersonas {
+    for (key, hookPersona) in hookPersonas {
+        // `VoicePersona` is keyed on the voice id's first character, mirroring today's
+        // `${voice:0:1}` lookup. A multi-character key means the hook moved to language
+        // codes and the Kit has to follow, so say that rather than silently skipping it.
+        guard key.count == 1, let prefix = key.first else {
+            failures.append("resolve_flavor() has a multi-character arm '\(key)' (\(hookPersona.name)) that VoicePersona cannot represent — it is keyed on Character. Widen the Kit map alongside the hook (see issue #39)")
+            continue
+        }
         guard let kitPersona = VoicePersona.byPrefix[prefix] else {
             failures.append("VoicePersona.byPrefix has no '\(prefix)' — the hook applies a \(hookPersona.name) persona that Settings never discloses")
             continue
@@ -69,7 +85,7 @@ func voicePersonaParityFailures() -> [String] {
             failures.append("descriptor mismatch for '\(prefix)': Kit says '\(kitPersona.descriptor)', hook says '\(hookPersona.descriptor)'")
         }
     }
-    for prefix in VoicePersona.byPrefix.keys where hookPersonas[prefix] == nil {
+    for prefix in VoicePersona.byPrefix.keys where hookPersonas[String(prefix)] == nil {
         failures.append("VoicePersona.byPrefix has '\(prefix)' but resolve_flavor() does not — Settings would disclose a persona the model is never given")
     }
 
