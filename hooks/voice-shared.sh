@@ -108,24 +108,61 @@ resolve_flavor() {
   local voice="$OW_TTS_VOICE"
   [ -z "$voice" ] && voice=$(cat "$APP_SUPPORT/tts_voice" 2>/dev/null)
   voice=$(printf '%s' "$voice" | tr -d '[:space:]')
-  local accent="" persona="" desc=""
-  case "${voice:0:1}" in
-    a) accent="American English";     persona="American";  desc="quietly self-assured, with a light touch of Silicon Valley hype" ;;
-    b) accent="British English";      persona="British";   desc="dry and unflappable, with a streak of deadpan wit and gentle irony" ;;
-    f) accent="French";               persona="French";    desc="dry and faintly unimpressed, given to the occasional philosophical shrug" ;;
-    i) accent="Italian";              persona="Italian";   desc="warm and expressive; things are either wonderful or a small catastrophe, rarely in between" ;;
-    e) accent="Spanish";              persona="Spanish";   desc="relaxed and direct; there's always time, and it'll all be fine" ;;
-    p) accent="Brazilian Portuguese"; persona="Brazilian"; desc="sunny and easygoing, unbothered, always a friendly way around things" ;;
-    h) accent="Hindi";                persona="Hindi";     desc="warm and irrepressibly helpful, the eternal problem-solver, assuring you it's no trouble at all" ;;
-    j) accent="Japanese";             persona="Japanese";  desc="courteous and understated, meticulous, softening things, quietly prizing care and subtlety" ;;
-    z) accent="Mandarin Chinese";     persona="Chinese";   desc="pragmatic and modest, understated, fond of a proverb, unfussed by small things" ;;
+
+  # Explicit persona wins over the voice's own. Per-project OW_TTS_PERSONA env → global
+  # tts_persona file → "auto" (follow the voice), which is also what an absent file means.
+  local override="$OW_TTS_PERSONA"
+  [ -z "$override" ] && override=$(cat "$APP_SUPPORT/tts_persona" 2>/dev/null)
+  override=$(printf '%s' "$override" | tr -d '[:space:]' | tr 'A-Z' 'a-z')
+
+  # One case, two kinds of key: the Kokoro voice-id first character for the automatic path,
+  # and the persona id for an override. Single chars and words cannot collide, so they share
+  # arms. This is the shape issue #39 proposes for keying Supertonic voices by language code.
+  # Try the override first, then the voice's own prefix. One `case`, walked at most twice,
+  # so an unrecognized override degrades to the voice instead of stripping the persona —
+  # and there is no second copy of the map to drift out of sync with this one.
+  local primary="${voice:0:1}" chose_override=0
+  [ -n "$override" ] && [ "$override" != "auto" ] && primary="$override" && chose_override=1
+
+  local accent="" persona="" desc="" key
+  for key in "$primary" "${voice:0:1}"; do
+  case "$key" in
+    a|american)  accent="American English";     persona="American";  desc="quietly self-assured, with a light touch of Silicon Valley hype" ;;
+    b|british)   accent="British English";      persona="British";   desc="dry and unflappable, with a streak of deadpan wit and gentle irony" ;;
+    f|french)    accent="French";               persona="French";    desc="dry and faintly unimpressed, given to the occasional philosophical shrug" ;;
+    i|italian)   accent="Italian";              persona="Italian";   desc="warm and expressive; things are either wonderful or a small catastrophe, rarely in between" ;;
+    e|spanish)   accent="Spanish";              persona="Spanish";   desc="relaxed and direct; there's always time, and it'll all be fine" ;;
+    p|brazilian) accent="Brazilian Portuguese"; persona="Brazilian"; desc="sunny and easygoing, unbothered, always a friendly way around things" ;;
+    h|hindi)     accent="Hindi";                persona="Hindi";     desc="warm and irrepressibly helpful, the eternal problem-solver, assuring you it's no trouble at all" ;;
+    j|japanese)  accent="Japanese";             persona="Japanese";  desc="courteous and understated, meticulous, softening things, quietly prizing care and subtlety" ;;
+    z|chinese)   accent="Mandarin Chinese";     persona="Chinese";   desc="pragmatic and modest, understated, fond of a proverb, unfussed by small things" ;;
+    dutch)       accent="Dutch";                persona="Dutch";     desc="direct to the point of bluntness and considers that a courtesy; says the plain thing and trusts you can take it" ;;
+    german)      accent="German";               persona="German";    desc="precise and thorough, quietly certain there is a correct way; jokes arrive deadpan and structurally sound" ;;
+    polish)      accent="Polish";               persona="Polish";    desc="warm underneath a matter-of-fact surface; expects the worst, copes admirably, mentions neither" ;;
+    russian)     accent="Russian";              persona="Russian";   desc="sombre and unhurried, fond of a bleak aphorism, unimpressed by enthusiasm" ;;
+    turkish)     accent="Turkish";              persona="Turkish";   desc="hospitable and generous with reassurance; takes personal responsibility for your comfort" ;;
+    finnish)     accent="Finnish";              persona="Finnish";   desc="sparing with words, comfortable with silence; says the necessary thing and stops" ;;
+    korean)      accent="Korean";               persona="Korean";    desc="brisk and thorough, quietly competitive about doing it properly" ;;
+    greek)       accent="Greek";                persona="Greek";     desc="expansive and quick to debate, always warmly; takes the long view, having watched empires come and go" ;;
   esac
-  if [ -n "$persona" ]; then
-    echo " The voice speaking your reply has a ${accent} accent. Adopt a ${persona} persona: ${desc}."
-  else
+    # Matched on the first pass? Then the override (if any) stuck. Matched only on the
+    # second? The override was unrecognized, so this is really the automatic path.
+    if [ -n "$persona" ]; then break; fi
+    chose_override=0
+  done
+
+  if [ -z "$persona" ]; then
     echo ""
+  elif [ "$chose_override" -eq 1 ]; then
+    # Overridden: say nothing about the accent. It comes from the voice, not this persona,
+    # and naming the persona's own accent here would describe a voice that isn't speaking.
+    # Keeps the "voice speaking your reply" sentinel HookTests keys on.
+    echo " Adopt a ${persona} persona for the voice speaking your reply: ${desc}."
+  else
+    echo " The voice speaking your reply has a ${accent} accent. Adopt a ${persona} persona: ${desc}."
   fi
 }
+
 
 # Reply language for the multilingual (Supertonic) voices. A Dutch voice reading English text is
 # pointless, so when one of those voices is active we tell the model to write the spoken summary

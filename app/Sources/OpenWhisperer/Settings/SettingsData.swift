@@ -46,6 +46,28 @@ enum SettingsData {
         }
     }
 
+    /// Persona options for the selected voice. "Automatic" first, then the nine a voice can
+    /// select on its own — and the override-only personas *only* when a Supertonic voice is
+    /// active, since those exist precisely because Supertonic voices get none automatically.
+    /// Offering "Dutch" beside an American-English voice is a pairing nobody asked for.
+    static func personaOptions(for voiceID: String) -> [(id: String, label: String)] {
+        var options: [(id: String, label: String)] = [
+            (VoicePersona.automatic, automaticPersonaLabel(for: voiceID))
+        ]
+        options += VoicePersona.automaticPersonas.map { ($0.id, $0.name) }
+        if TTSVoiceRouter.isSupertonic(voiceID) {
+            options += VoicePersona.overrideOnlyPersonas.map { ($0.id, $0.name) }
+        }
+        return options
+    }
+
+    /// Names what "Automatic" resolves to, so the default is not a mystery — and says
+    /// plainly when it resolves to nothing, which is every Supertonic voice today (issue #39).
+    private static func automaticPersonaLabel(for voiceID: String) -> String {
+        if let persona = VoicePersona.forVoice(voiceID) { return "Automatic (\(persona.name))" }
+        return "Automatic (none for this voice)"
+    }
+
     /// Fully-qualified label for the collapsed control — `Greek · F1 (Female)`. The bare
     /// voice name is ambiguous once the menu is closed: `F1 (F)` named no language at all.
     static func voiceLabel(_ voiceID: String) -> String {

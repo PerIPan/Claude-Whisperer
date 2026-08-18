@@ -29,16 +29,15 @@ func voicePersonaParityFailures() -> [String] {
     let body = afterStart.range(of: "\n}").map { String(afterStart[..<$0.lowerBound]) }
         ?? String(afterStart)
 
-    // Arms look like:  a) accent="American English";  persona="American";  desc="…" ;;
-    // Parsing the hook rather than restating it keeps this a parity check, not a third copy.
+    // Arms look like:  a|american) accent="…"; persona="…"; desc="…" ;;
+    // and, for a persona with no Kokoro prefix:  dutch) accent="…"; …
     //
-    // The label is matched as `[a-z]{1,3}` with optional `|` alternates rather than a single
-    // character, because issue #39 proposes keying Supertonic voices by language code
-    // (`nl)`, `a|en)`). A single-character pattern still parses today's arms, so a *mixed*
-    // map — single-char arms kept, `nl)` added — would parse clean while silently ignoring
-    // the new ones, which is this check's own failure mode reappearing as a false pass.
+    // Parsing the hook rather than restating it keeps this a parity check, not a third copy.
+    // The label allows `|` alternates and words, not just a single character: personas are
+    // now reachable by id as well as by voice prefix, and issue #39 proposes the same shape
+    // for keying Supertonic voices by language code.
     var hookPersonas: [String: VoicePersona.Persona] = [:]
-    let pattern = #"(?:^|[\s;])([a-z]{1,3}(?:\|[a-z]{1,3})*)\)\s*accent="([^"]+)"\s*;\s*persona="([^"]+)"\s*;\s*desc="([^"]+)""#
+    let pattern = #"(?:^|[\s;])([a-z]{1,12}(?:\|[a-z]{1,12})*)\)\s*accent="([^"]+)"\s*;\s*persona="([^"]+)"\s*;\s*desc="([^"]+)""#
     let regex = try! NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
     let range = NSRange(body.startIndex..., in: body)
     for match in regex.matches(in: body, range: range) {
@@ -47,10 +46,8 @@ func voicePersonaParityFailures() -> [String] {
               let nameRange = Range(match.range(at: 3), in: body),
               let descRange = Range(match.range(at: 4), in: body) else { continue }
         let persona = VoicePersona.Persona(
-            accent: String(body[accentRange]),
-            name: String(body[nameRange]),
-            descriptor: String(body[descRange]))
-        // `a|en)` registers both aliases against the same persona.
+            id: "", accent: String(body[accentRange]), name: String(body[nameRange]),
+            descriptor: String(body[descRange]), prefix: nil)
         for key in String(body[labelRange]).split(separator: "|") {
             hookPersonas[String(key)] = persona
         }
@@ -60,33 +57,38 @@ func voicePersonaParityFailures() -> [String] {
         return ["voice-shared.sh: resolve_flavor's case arms did not parse — did the map's shape change?"]
     }
 
-    // Both directions: a key only in Swift is a disclosure for a persona the model never
-    // gets, and one only in the hook is a persona applied with nothing said about it — the
-    // very gap this type was added to close.
-    for (key, hookPersona) in hookPersonas {
-        // `VoicePersona` is keyed on the voice id's first character, mirroring today's
-        // `${voice:0:1}` lookup. A multi-character key means the hook moved to language
-        // codes and the Kit has to follow, so say that rather than silently skipping it.
-        guard key.count == 1, let prefix = key.first else {
-            failures.append("resolve_flavor() has a multi-character arm '\(key)' (\(hookPersona.name)) that VoicePersona cannot represent — it is keyed on Character. Widen the Kit map alongside the hook (see issue #39)")
-            continue
+    func compare(_ key: String, _ kit: VoicePersona.Persona) {
+        guard let hook = hookPersonas[key] else {
+            failures.append("resolve_flavor() has no '\(key)' arm — Settings offers the \(kit.name) persona but the model would never be given it")
+            return
         }
-        guard let kitPersona = VoicePersona.byPrefix[prefix] else {
-            failures.append("VoicePersona.byPrefix has no '\(prefix)' — the hook applies a \(hookPersona.name) persona that Settings never discloses")
-            continue
+        if kit.accent != hook.accent {
+            failures.append("accent mismatch for '\(key)': Kit says '\(kit.accent)', hook says '\(hook.accent)'")
         }
-        if kitPersona.accent != hookPersona.accent {
-            failures.append("accent mismatch for '\(prefix)': Kit says '\(kitPersona.accent)', hook says '\(hookPersona.accent)'")
+        if kit.name != hook.name {
+            failures.append("persona name mismatch for '\(key)': Kit says '\(kit.name)', hook says '\(hook.name)'")
         }
-        if kitPersona.name != hookPersona.name {
-            failures.append("persona name mismatch for '\(prefix)': Kit says '\(kitPersona.name)', hook says '\(hookPersona.name)'")
-        }
-        if kitPersona.descriptor != hookPersona.descriptor {
-            failures.append("descriptor mismatch for '\(prefix)': Kit says '\(kitPersona.descriptor)', hook says '\(hookPersona.descriptor)'")
+        if kit.descriptor != hook.descriptor {
+            failures.append("descriptor mismatch for '\(key)': Kit says '\(kit.descriptor)', hook says '\(hook.descriptor)'")
         }
     }
-    for prefix in VoicePersona.byPrefix.keys where hookPersonas[String(prefix)] == nil {
-        failures.append("VoicePersona.byPrefix has '\(prefix)' but resolve_flavor() does not — Settings would disclose a persona the model is never given")
+
+    // Every persona must be reachable by id (the override path) and, when it has one, by
+    // its Kokoro prefix (the automatic path). Both are real lookups the hook performs.
+    var expected = Set<String>()
+    for kit in VoicePersona.all {
+        compare(kit.id, kit)
+        expected.insert(kit.id)
+        if let prefix = kit.prefix {
+            compare(String(prefix), kit)
+            expected.insert(String(prefix))
+        }
+    }
+
+    // And nothing the hook knows may be missing from the Kit — that is a persona applied
+    // with nothing said about it, the gap VoicePersona exists to close.
+    for key in hookPersonas.keys where !expected.contains(key) {
+        failures.append("resolve_flavor() has a '\(key)' arm that VoicePersona.all does not — Settings would never disclose or offer it")
     }
 
     // The persona line is ungated and rides on every turn for a personified voice, so assert
