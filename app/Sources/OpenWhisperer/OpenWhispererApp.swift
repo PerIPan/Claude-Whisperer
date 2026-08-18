@@ -80,6 +80,15 @@ private struct MenuBarMenu: View {
 
         Divider()
 
+        // The setup sheet's "Skip setup" tooltip promises you can reopen it from here, and
+        // a first run that can only ever happen once is hostile anyway: connecting a second
+        // agent, or granting a permission you skipped, is exactly when you want it back.
+        Button("Setup…") {
+            FirstRunWindow.show(appDelegate: appDelegate) {
+                appDelegate.setupManager.runFirstLaunchSetup { _ in }
+            }
+        }
+
         Button("Quit Open Whisperer") { NSApplication.shared.terminate(nil) }
             .keyboardShortcut("q", modifiers: .command)
     }

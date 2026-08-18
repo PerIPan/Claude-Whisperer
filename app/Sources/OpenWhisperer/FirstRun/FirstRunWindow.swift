@@ -23,6 +23,11 @@ final class FirstRunWindow: NSObject, NSWindowDelegate {
     static func show(appDelegate: AppDelegate, onClose: @escaping () -> Void) {
         DispatchQueue.main.async {
             if let existing = shared, let w = existing.window {
+                // Adopt the newer closure rather than keeping the one from the first call.
+                // Unreachable while the only caller was first launch; the menubar's "Setup…"
+                // makes a second call real, and silently dropping its `onClose` would mean
+                // that invocation never completes.
+                existing.onClose = onClose
                 w.makeKeyAndOrderFront(nil)
                 NSApp.activate(ignoringOtherApps: true)
                 return
