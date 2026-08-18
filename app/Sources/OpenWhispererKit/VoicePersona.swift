@@ -72,6 +72,20 @@ public enum VoicePersona {
         return byPrefix[first]
     }
 
+    /// Compact form for the voice picker's section headers, where the point is comparing
+    /// personas *before* committing to a voice rather than being told about the one already
+    /// selected. Drops `disclosure`'s "Tone only" clause — that qualifier belongs where the
+    /// choice has been made, and repeating it on every group turns a browsable list into a
+    /// wall of identical disclaimers.
+    ///
+    /// Safe to key off any voice in a Kokoro group: personas are per-language, and every
+    /// voice in a group shares the id prefix `resolve_flavor()` matches on. `VoicePersonaChecks`
+    /// asserts that group-level consistency rather than trusting it.
+    public static func summary(for voiceID: String) -> String? {
+        guard let persona = forVoice(voiceID) else { return nil }
+        return "\(persona.article.capitalized) \(persona.name) persona — \(persona.descriptor)."
+    }
+
     /// One sentence for Settings, phrased so the trade is legible at a glance: what changes
     /// (tone) and what does not (the work). Deliberately not the nudge's wording — that one
     /// is an instruction to a model, this one is a disclosure to a person.

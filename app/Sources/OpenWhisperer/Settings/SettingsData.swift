@@ -20,9 +20,19 @@ enum SettingsData {
             return OWPickerSection(
                 id: group.name,
                 title: "\(group.name) · \(isSupertonic ? "Supertonic" : "Kokoro")",
-                // F1/M1 read as accents or quality grades unless told otherwise. This was
-                // settled in the 2.0.0 design and only ever lived in that doc until now.
-                caption: isSupertonic ? "Speaker styles, not regional accents." : nil,
+                // Each engine's groups need a different thing explained.
+                //
+                // Supertonic: F1/M1 read as accents or quality grades unless told otherwise
+                // (settled in the 2.0.0 design, and only ever lived in that doc until now).
+                //
+                // Kokoro: the group carries a persona that shapes every spoken reply, so the
+                // header says which one — letting you compare personas before committing to
+                // a voice, rather than reading about the one already chosen. Keyed off the
+                // group's first voice: persona is per-language, and `VoicePersonaChecks`
+                // asserts every voice in a group agrees rather than trusting it.
+                caption: isSupertonic
+                    ? "Speaker styles, not regional accents."
+                    : group.voices.first.flatMap { VoicePersona.summary(for: $0.id) },
                 options: group.voices.map { voice in
                     OWPickerOption(
                         id: voice.id,
