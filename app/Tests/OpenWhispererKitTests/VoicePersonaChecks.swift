@@ -73,5 +73,32 @@ func voicePersonaFailures() -> [String] {
         check("\(voice.id) has no 'a <vowel>' slip", !slip)
     }
 
+    // The picker keys each Kokoro group's caption off that group's FIRST voice, so every
+    // voice in the group must resolve to the same persona. If a group ever mixed prefixes
+    // the header would quietly describe a persona most of its rows don't carry.
+    for group in TTSVoiceRegistry.groups {
+        let kokoro = group.voices.filter { !TTSVoiceRouter.isSupertonic($0.id) }
+        guard let first = kokoro.first else { continue }
+        guard let expected = VoicePersona.forVoice(first.id) else {
+            failures.append("VoicePersona: Kokoro group '\(group.name)' has no persona for \(first.id) — its picker header would be blank")
+            continue
+        }
+        for voice in kokoro.dropFirst() where VoicePersona.forVoice(voice.id) != expected {
+            failures.append("VoicePersona: group '\(group.name)' mixes personas — \(first.id) is \(expected.name) but \(voice.id) is \(VoicePersona.forVoice(voice.id)?.name ?? "none")")
+        }
+    }
+
+    // `summary` is the picker form: names the persona, carries the descriptor, and drops
+    // the "Tone only" clause that `disclosure` ends on.
+    if let s = VoicePersona.summary(for: "af_heart") {
+        check("summary names the persona", s.contains("An American persona"))
+        check("summary carries the descriptor", s.contains("Silicon Valley hype"))
+        check("summary drops the Tone only clause", !s.contains("Tone only"))
+    } else {
+        failures.append("VoicePersona: af_heart produced no summary")
+    }
+    check("summary capitalises the article", VoicePersona.summary(for: "bm_george")?.hasPrefix("A British") == true)
+    check("no summary without a persona", VoicePersona.summary(for: "supertonic:nl:F1") == nil)
+
     return failures
 }
