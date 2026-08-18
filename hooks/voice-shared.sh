@@ -99,7 +99,10 @@ resolve_depth_line() {
 # first char: a light national character, set for English (a/b) too. The flavors stay subdued,
 # so they don't detract from the message. Personality only, no vocabulary steering; whatever
 # code-switching happens is the model's own.
-# The map lives ONLY here (unknown/no voice → nothing); HookTests is its guard.
+# This map is the source of truth for what the model is told (unknown/no voice → nothing).
+# `VoicePersona` in OpenWhispererKit mirrors it for display only, so Settings can disclose the
+# persona a voice carries; reword here first. HookTests' voicePersonaParityFailures() parses
+# these arms and fails if the two drift.
 # Resolved voice: per-project OW_TTS_VOICE env → global tts_voice file.
 resolve_flavor() {
   local voice="$OW_TTS_VOICE"

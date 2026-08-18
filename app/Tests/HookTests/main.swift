@@ -7,6 +7,7 @@ var failures: [String] = []
 failures += voiceContextFailures()
 failures += agyPreInvocationFailures()
 failures += voiceLanguageParityFailures()
+failures += voicePersonaParityFailures()
 
 if failures.isEmpty {
     print("✅ HookTests: all checks passed")
