@@ -66,6 +66,19 @@ struct VoiceTab: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
+                    // The other half of the same surprise, and the bigger one: a Kokoro voice
+                    // also attaches a national persona to every spoken reply (resolve_flavor
+                    // in voice-shared.sh) — ungated, every turn. Nothing disclosed it before.
+                    // Mutually exclusive with the line above: Supertonic voices get a reply
+                    // language instead of a persona, so exactly one of the two ever shows.
+                    if let persona = VoicePersona.disclosure(for: selectedVoice) {
+                        Text(persona)
+                            .font(OWFont.caption())
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
                     OWInternalDivider()
 
                     OWPickerRow(label: "Speed", labelWidth: 62) {
