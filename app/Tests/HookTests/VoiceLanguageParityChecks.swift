@@ -22,26 +22,13 @@ func voiceLanguageParityFailures() -> [String] {
     }
 
     // Scope to resolve_language_line's body before parsing: an unrelated `xx) language="…"`
-    // elsewhere in the file would otherwise be absorbed into the map.
-    guard let bodyStart = shared.range(of: "resolve_language_line() {") else {
+    // elsewhere in the file would otherwise be absorbed into the map. The map is a bash
+    // `case` of `code) language="Name" ;;` arms; `VoiceSharedMaps` is the one parser, shared
+    // with the Pi mirror's check, so this stays a parity check instead of a second copy.
+    guard let body = VoiceSharedMaps.body(of: "resolve_language_line", in: shared) else {
         return ["voice-shared.sh: resolve_language_line() not found — did it get renamed?"]
     }
-    let afterStart = shared[bodyStart.upperBound...]
-    let body = afterStart.range(of: "\n}").map { String(afterStart[..<$0.lowerBound]) }
-        ?? String(afterStart)
-
-    // The map is a bash `case` of `code) language="Name" ;;` arms. Parsing the hook rather
-    // than restating it keeps this a parity check instead of a second copy.
-    // `{2,3}` not `{2}`: a three-letter code like `yue` would otherwise register as `ue`
-    // and quietly compare against the wrong language.
-    var hookNames: [String: String] = [:]
-    let regex = try! NSRegularExpression(pattern: #"\b([a-z]{2,3})\)\s*language="([^"]+)""#)
-    let range = NSRange(body.startIndex..., in: body)
-    for match in regex.matches(in: body, range: range) {
-        guard let codeRange = Range(match.range(at: 1), in: body),
-              let nameRange = Range(match.range(at: 2), in: body) else { continue }
-        hookNames[String(body[codeRange])] = String(body[nameRange])
-    }
+    let hookNames = VoiceSharedMaps.languages(inLanguageBody: body)
 
     if hookNames.isEmpty {
         return ["voice-shared.sh: resolve_language_line's case arms did not parse — did the map's shape change?"]

@@ -21,37 +21,13 @@ func voicePersonaParityFailures() -> [String] {
     }
 
     // Scope to resolve_flavor's body: `resolve_language_line()` below it also has `xx) …`
-    // arms, and an unscoped match would blend the two maps together.
-    guard let bodyStart = shared.range(of: "resolve_flavor() {") else {
+    // arms, and an unscoped match would blend the two maps together. Parsing the hook rather
+    // than restating it keeps this a parity check, not a third copy (`VoiceSharedMaps` is the
+    // one parser, shared with the Pi mirror's check).
+    guard let body = VoiceSharedMaps.body(of: "resolve_flavor", in: shared) else {
         return ["voice-shared.sh: resolve_flavor() not found — did it get renamed?"]
     }
-    let afterStart = shared[bodyStart.upperBound...]
-    let body = afterStart.range(of: "\n}").map { String(afterStart[..<$0.lowerBound]) }
-        ?? String(afterStart)
-
-    // Arms look like:  a|american) accent="…"; persona="…"; desc="…" ;;
-    // and, for a persona with no Kokoro prefix:  dutch) accent="…"; …
-    //
-    // Parsing the hook rather than restating it keeps this a parity check, not a third copy.
-    // The label allows `|` alternates and words, not just a single character: personas are
-    // now reachable by id as well as by voice prefix, and issue #39 proposes the same shape
-    // for keying Supertonic voices by language code.
-    var hookPersonas: [String: VoicePersona.Persona] = [:]
-    let pattern = #"(?:^|[\s;])([a-z]{1,12}(?:\|[a-z]{1,12})*)\)\s*accent="([^"]+)"\s*;\s*persona="([^"]+)"\s*;\s*desc="([^"]+)""#
-    let regex = try! NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
-    let range = NSRange(body.startIndex..., in: body)
-    for match in regex.matches(in: body, range: range) {
-        guard let labelRange = Range(match.range(at: 1), in: body),
-              let accentRange = Range(match.range(at: 2), in: body),
-              let nameRange = Range(match.range(at: 3), in: body),
-              let descRange = Range(match.range(at: 4), in: body) else { continue }
-        let persona = VoicePersona.Persona(
-            id: "", accent: String(body[accentRange]), name: String(body[nameRange]),
-            descriptor: String(body[descRange]), prefix: nil)
-        for key in String(body[labelRange]).split(separator: "|") {
-            hookPersonas[String(key)] = persona
-        }
-    }
+    let hookPersonas = VoiceSharedMaps.personas(inFlavorBody: body)
 
     if hookPersonas.isEmpty {
         return ["voice-shared.sh: resolve_flavor's case arms did not parse — did the map's shape change?"]
