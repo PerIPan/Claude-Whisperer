@@ -129,10 +129,18 @@ enum Paths {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude.json")
     }()
 
-    /// Codex CLI config (~/.codex/config.toml)
+    /// Codex CLI config (~/.codex/config.toml) — holds the `speak` MCP server.
     static let codexConfig: URL = {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".codex").appendingPathComponent("config.toml")
+    }()
+
+    /// Codex CLI hooks (~/.codex/hooks.json) — holds the UserPromptSubmit hook. Codex reads
+    /// hooks from either file but warns when one layer carries both, and other tools already
+    /// keep theirs here, so the hook lives here rather than inline in config.toml.
+    static let codexHooks: URL = {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".codex").appendingPathComponent("hooks.json")
     }()
 
     /// Pi coding agent — bundled extension source (Resources/pi/openwhisperer.ts).

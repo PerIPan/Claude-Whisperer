@@ -191,7 +191,7 @@ struct AgentsTab: View {
         case .claudeCode:
             return "Writes the UserPromptSubmit hook into ~/.claude/settings.json and the speak MCP server into ~/.claude.json. Re-applies cleanly on rebuild."
         case .codexCLI:
-            return "Writes the speak MCP server and UserPromptSubmit hook into ~/.codex/config.toml. Re-applies cleanly on rebuild."
+            return "Writes the speak MCP server into ~/.codex/config.toml and the UserPromptSubmit hook into ~/.codex/hooks.json. Re-applies cleanly on rebuild."
         case .pi:
             return "Copies the Open Whisperer extension into ~/.pi/agent/extensions/ (Pi is MCP-free)."
         case .antigravity:
