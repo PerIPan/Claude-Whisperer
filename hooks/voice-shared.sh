@@ -157,10 +157,19 @@ resolve_flavor() {
     # Overridden: say nothing about the accent. It comes from the voice, not this persona,
     # and naming the persona's own accent here would describe a voice that isn't speaking.
     # Keeps the "voice speaking your reply" sentinel HookTests keys on.
-    echo " Adopt a ${persona} persona for the voice speaking your reply: ${desc}."
+    echo " Adopt $(article "$persona") ${persona} persona for the voice speaking your reply: ${desc}."
   else
-    echo " The voice speaking your reply has a ${accent} accent. Adopt a ${persona} persona: ${desc}."
+    echo " The voice speaking your reply has $(article "$accent") ${accent} accent. Adopt $(article "$persona") ${persona} persona: ${desc}."
   fi
+}
+
+# "a" or "an" for the word that follows: "an American English accent", "a British persona".
+# Initial letter only — none of the names above start with a silent h or a "you" sound.
+article() {
+  case "$1" in
+    [AEIOUaeiou]*) echo "an" ;;
+    *) echo "a" ;;
+  esac
 }
 
 

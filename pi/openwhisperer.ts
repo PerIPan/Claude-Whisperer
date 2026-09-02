@@ -103,12 +103,17 @@ function resolveFlavor(): string {
       // Overridden: say nothing about the accent. It comes from the voice, not this persona,
       // and naming the persona's own accent would describe a voice that isn't speaking.
       return choseOverride
-        ? ` Adopt a ${hit.persona} persona for the voice speaking your reply: ${hit.desc}.`
-        : ` The voice speaking your reply has a ${hit.accent} accent. Adopt a ${hit.persona} persona: ${hit.desc}.`;
+        ? ` Adopt ${article(hit.persona)} ${hit.persona} persona for the voice speaking your reply: ${hit.desc}.`
+        : ` The voice speaking your reply has ${article(hit.accent)} ${hit.accent} accent. Adopt ${article(hit.persona)} ${hit.persona} persona: ${hit.desc}.`;
     }
     choseOverride = false;
   }
   return "";
+}
+
+/** "a" or "an" for the word that follows — mirrors `article()` in voice-shared.sh. */
+function article(word: string): string {
+  return /^[aeiou]/i.test(word) ? "an" : "a";
 }
 
 /**

@@ -270,6 +270,9 @@ func voiceContextFailures() -> [String] {
         let n = nudge(r.stdout)
         if n?.contains("American") != true { fail("americanPersona: missing 'American': \(n?.debugDescription ?? "nil")") }
         if n?.contains("voice speaking your reply") != true { fail("americanPersona: missing persona") }
+        // Vowel-initial accent and persona take "an", not the template's old hard-coded "a".
+        if n?.contains("has an American English accent") != true { fail("americanPersona: article: \(n?.debugDescription ?? "nil")") }
+        if n?.contains("Adopt an American persona") != true { fail("americanPersona: persona article: \(n?.debugDescription ?? "nil")") }
     }
 
     // 19) no voice set → NO flavor (safe default).
@@ -297,6 +300,9 @@ func voiceContextFailures() -> [String] {
         let n = nudge(r.stdout)
         if n?.contains("British") != true { fail("britishPersona: missing 'British'") }
         if n?.contains("voice speaking your reply") != true { fail("britishPersona: missing persona") }
+        // Consonant-initial keeps "a".
+        if n?.contains("has a British English accent") != true { fail("britishPersona: article: \(n?.debugDescription ?? "nil")") }
+        if n?.contains("Adopt a British persona") != true { fail("britishPersona: persona article: \(n?.debugDescription ?? "nil")") }
     }
 
     // 22) a different non-English branch (Italian) → persona present, its language named.
@@ -306,6 +312,18 @@ func voiceContextFailures() -> [String] {
         let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"), sandbox: s).stdout)
         if n?.contains("Italian") != true { fail("italianPersona: \(n?.debugDescription ?? "nil")") }
         if n?.contains("voice speaking your reply") != true { fail("italianPersona: missing persona") }
+        if n?.contains("has an Italian accent") != true { fail("italianPersona: article: \(n?.debugDescription ?? "nil")") }
+        if n?.contains("Adopt an Italian persona") != true { fail("italianPersona: persona article: \(n?.debugDescription ?? "nil")") }
+    }
+
+    // 22b) the override path drops the accent clause and still gets the article right.
+    do {
+        let s = newSandbox()
+        s.writeVoiceTurn(forPrompt: "go"); s.writeTtsVoice("bf_alice")
+        let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"),
+                               sandbox: s, env: ["OW_TTS_PERSONA": "italian"]).stdout)
+        if n?.contains("Adopt an Italian persona for the voice speaking your reply") != true { fail("overrideArticle: \(n?.debugDescription ?? "nil")") }
+        if n?.contains("accent") == true { fail("overrideArticle: accent clause should be dropped on override") }
     }
 
     // --- Per-project voice/speed overrides (env → nudge args; flavor follows the override) ---
