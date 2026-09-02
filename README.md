@@ -24,7 +24,7 @@ The command to bypass Gatekeeper for the DMG:
 xattr -cr /Applications/OpenWhisperer.app
 
 If you want to do it on the DMG itself before opening:
-xattr -d com.apple.quarantine ~/Downloads/OpenWhisperer-2.0.3.dmg
+xattr -d com.apple.quarantine ~/Downloads/OpenWhisperer-2.0.4.dmg
 
 
 ## What It Does
@@ -34,6 +34,14 @@ You use your coding agent — **Claude Code, Codex, Antigravity, or Pi** — nor
 Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ## What's New
+
+### 2.0.4
+
+- **Speech-to-text moved to upstream WhisperKit 1.1.0.** The app had been pinned to a fork carrying a one-line fix, without which *any* custom vocabulary made every dictation come back empty. Argmax shipped that fix upstream, so the fork is gone from the dependency graph.
+- **Custom vocabulary is safe to use again** — that's the fix above, in practical terms.
+- **Codex hooks move to `~/.codex/hooks.json`.** Codex warns when hooks are split between `hooks.json` and an inline `[hooks]` table in `config.toml`; it now writes only the former. Reconnect Codex in Settings → Agents to move an existing install.
+- **Pi gets the persona and reply-language layers** it was missing, so a spoken reply on Pi now matches Claude Code and Codex.
+- **No more "SDK auth failed" noise on Claude Code start.** Claude Code probes for an OAuth endpoint before connecting; the server answered with an empty body, which its SDK parsed as a malformed OAuth error and logged every time. It now answers with a proper JSON body.
 
 ### 2.0.3
 
@@ -101,7 +109,7 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ## Install
 
-[**Download OpenWhisperer-2.0.3.dmg**](https://github.com/PerIPan/OpenWhisperer/releases/download/v2.0.3/OpenWhisperer-2.0.3.dmg) — drag to Applications and launch.
+[**Download OpenWhisperer-2.0.4.dmg**](https://github.com/PerIPan/OpenWhisperer/releases/download/v2.0.4/OpenWhisperer-2.0.4.dmg) — drag to Applications and launch.
 
 On first launch, the app:
 - Downloads the Whisper (speech-to-text) and Kokoro (text-to-speech) CoreML models
@@ -274,7 +282,7 @@ chmod +x build-dmg.sh
 ./build-dmg.sh
 ```
 
-This produces `OpenWhisperer.app` and `OpenWhisperer-2.0.3.dmg` in `app/.build/`. Launch the app — on first launch it downloads the Whisper and Kokoro models, then starts the in-app TTS server on `localhost:8000` automatically. (For a plain debug build during development, run `swift build` from `app/`.)
+This produces `OpenWhisperer.app` and `OpenWhisperer-2.0.4.dmg` in `app/.build/`. Launch the app — on first launch it downloads the Whisper and Kokoro models, then starts the in-app TTS server on `localhost:8000` automatically. (For a plain debug build during development, run `swift build` from `app/`.)
 
 ### Step 2: Wire up the hooks
 
