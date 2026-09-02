@@ -53,7 +53,7 @@ Conventional Commits, matching the existing history: `type(scope): subject`, whe
 ### Targets (`app/Package.swift`)
 
 - **`OpenWhispererKit`** — pure, dependency-free, fast-to-test logic: `SentenceSplitter`, `NumberNormalizer`, `SubmitTrigger`, `VoiceSignal`, `VoiceMigration`, `PCMConversion`, `DisfluencyFilter`, `TTSVoiceRouter`, `STTLanguages`, `TTSSampleText`.
-- **`OpenWhisperer`** — the executable (AppKit/SwiftUI menubar app + native STT/TTS). Depends on `WhisperKit` (STT, pinned to a fork revision) and `FluidAudio` (Kokoro TTS).
+- **`OpenWhisperer`** — the executable (AppKit/SwiftUI menubar app + native STT/TTS). Depends on `WhisperKit` (STT, upstream `argmaxinc` from 1.1.0) and `FluidAudio` (Kokoro TTS). The fork pin was dropped 2026-09-02 once argmaxinc shipped PR #514 in v1.1.0 — see `Package.swift` for what it was guarding and why `hakanensari/WhisperKit`'s `main` is a downgrade, not an upgrade.
 - **`OpenWhispererKitTests`**, **`HookTests`** — the two executable test runners above.
 
 Entry point `OpenWhispererMain.main()`: `--serve-tts` → headless TTS; otherwise the SwiftUI `MenuBarExtra` app. `AppDelegate` owns the long-lived managers (`ServerManager`, `SetupManager`, `DictationManager`, `HotkeyManager`, `AccessibilityManager`). The app is `LSUIElement` (menubar only, no dock icon).
