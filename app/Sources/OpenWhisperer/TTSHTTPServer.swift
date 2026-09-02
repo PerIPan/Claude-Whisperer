@@ -213,11 +213,18 @@ final class TTSHTTPServer {
             }
 
         case ("GET", "/mcp"):
-            // We don't offer the optional server→client SSE stream; say so rather than 404.
-            respond(conn, "405 Method Not Allowed", Data())
+            // We don't offer the optional server→client SSE stream; say so rather than bare 404.
+            respond(conn, "405 Method Not Allowed",
+                    Data(#"{"error":"method_not_allowed","error_description":"GET not supported; use POST"}"#.utf8),
+                    contentType: "application/json")
 
         default:
-            respond(conn, "404 Not Found", Data())
+            // Return a JSON error object so MCP clients probing OAuth discovery endpoints
+            // (e.g. /.well-known/oauth-authorization-server) receive valid JSON 404 rather than
+            // an empty body that triggers JSON parse EOF errors during auth discovery.
+            respond(conn, "404 Not Found",
+                    Data(#"{"error":"not_found"}"#.utf8),
+                    contentType: "application/json")
         }
     }
 
