@@ -28,6 +28,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ConfigManager.migrateDefaultSTTLanguage()
         // Strip the obsolete Stop hook (replaced by the speak MCP tool) from existing installs.
         ConfigManager.migrateRemoveClaudeStopHook()
+        // Move a Codex hook still written inline in config.toml over to hooks.json.
+        ConfigManager.migrateCodexInlineHook()
         // Delete the orphaned overlay_lines pref (grip removed with menubar history).
         ConfigManager.removeLegacyOverlayLines()
         // Move a legacy ~/Documents Whisper hub into Application Support before the

@@ -134,24 +134,33 @@ enum ConfigManager {
         }
     }
 
-    // MARK: - Codex CLI: config.toml
+    // MARK: - Codex CLI: config.toml + hooks.json
 
     static func showCodexConfigInstructions() {
         let window = InstructionWindow(
-            title: "Step 1: Codex voice (config.toml + hook trust)",
+            title: "Step 1: Codex voice (config.toml + hooks.json + hook trust)",
             instructions: """
-            "Apply" wires these into ~/.codex/config.toml automatically. To do it
-            by hand, add:
+            OpenWhisperer adds voice to Codex in two pieces. "Apply" wires both
+            automatically; to do it by hand:
 
-            [mcp_servers.OpenWhisperer]
-            url = "http://localhost:8000/mcp"
+            1) The `speak` MCP tool (in ~/.codex/config.toml):
 
-            [[hooks.UserPromptSubmit]]
+               [mcp_servers.OpenWhisperer]
+               url = "http://localhost:8000/mcp"
 
-            [[hooks.UserPromptSubmit.hooks]]
-            type = "command"
-            command = "\(Paths.voiceContextHook.path)"
-            timeout = 30
+            2) UserPromptSubmit hook (in ~/.codex/hooks.json, merged with any hooks
+               already there) — nudges Codex to speak a summary first on dictated turns:
+
+               {
+                 "hooks": {
+                   "UserPromptSubmit": [{
+                     "hooks": [{ "type": "command", "command": "\(Paths.voiceContextHook.path)", "timeout": 30 }]
+                   }]
+                 }
+               }
+
+            Older versions put the hook inline in config.toml; Codex warns when a
+            layer has both, so "Apply" moves it over.
 
             IMPORTANT — hook trust: Codex silently ignores untrusted hooks. The
             first time you run `codex` after this, approve trusting the
@@ -163,61 +172,69 @@ enum ConfigManager {
         window.show()
     }
 
-    // MARK: - Auto-apply hook to Codex config.toml
+    // MARK: - Auto-apply: Codex config.toml + hooks.json
 
-    /// Register the `speak` MCP server + the shared `voice-context.sh` UserPromptSubmit hook in
-    /// ~/.codex/config.toml, and drop the obsolete `notify` (Stop-style) line. Idempotent
-    /// append-if-absent; preserves the user's other config. NB: Codex silently skips *untrusted*
-    /// hooks, so the user must approve the hook once in Codex (see showCodexConfigInstructions).
+    /// Register the `speak` MCP server in ~/.codex/config.toml and the shared `voice-context.sh`
+    /// UserPromptSubmit hook in ~/.codex/hooks.json. Codex reads hooks from both files but warns
+    /// whenever one layer carries both, and other tools (Herdr) already keep theirs in hooks.json,
+    /// so the hook goes there and any inline copy an earlier version wrote into config.toml is
+    /// lifted out (`CodexConfigTOML`, along with the older `notify` line). Both edits are scoped
+    /// to our own entries and idempotent; a hooks.json that won't parse is left alone rather than
+    /// clobbered. NB: Codex silently skips *untrusted* hooks, and trust is keyed by file and
+    /// position, so after the move the user must approve the hook once more in Codex (see
+    /// showCodexConfigInstructions).
     static func applyHookToCodexConfig() -> (success: Bool, message: String) {
-        let configURL = Paths.codexConfig
         let fm = FileManager.default
-        try? fm.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? fm.createDirectory(at: Paths.codexConfig.deletingLastPathComponent(), withIntermediateDirectories: true)
 
-        var content = ""
-        if fm.fileExists(atPath: configURL.path), let existing = try? String(contentsOf: configURL, encoding: .utf8) {
-            content = existing
+        // hooks.json first, so a failure here leaves the inline hook (and Codex's warning) in
+        // place rather than leaving Codex with no hook at all.
+        var hooksRoot: [String: Any] = [:]
+        if fm.fileExists(atPath: Paths.codexHooks.path) {
+            guard let data = try? Data(contentsOf: Paths.codexHooks),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return (false, "~/.codex/hooks.json isn't valid JSON — fix it, then connect again")
+            }
+            hooksRoot = json
         }
-
-        // Drop our obsolete `notify = [...]` line (matched exactly to avoid keys like notify_on_error;
-        // only ours — referencing our hook — so a user's unrelated notify is left alone).
-        var lines = content.components(separatedBy: "\n").filter { line in
-            let t = line.trimmingCharacters(in: .whitespaces)
-            guard t.hasPrefix("notify") else { return true }
-            let rest = t.dropFirst("notify".count)
-            guard let f = rest.first, f == " " || f == "=" || f == "\t" else { return true }
-            return !(line.contains("codex-tts-hook") || line.contains("OpenWhisperer"))
-        }
-
-        var added: [String] = []
-        if !content.contains("[mcp_servers.OpenWhisperer]") {
-            added += ["", "[mcp_servers.OpenWhisperer]", "url = \"http://localhost:8000/mcp\""]
-        }
-        if !content.contains("voice-context.sh") {
-            added += ["", "[[hooks.UserPromptSubmit]]", "",
-                      "[[hooks.UserPromptSubmit.hooks]]",
-                      "type = \"command\"",
-                      "command = \"\(Paths.voiceContextHook.path)\"",
-                      "timeout = 30"]
-        }
-        if !added.isEmpty {
-            if let last = lines.last, !last.trimmingCharacters(in: .whitespaces).isEmpty { lines.append("") }
-            lines += added
+        let hook: [String: Any] = ["type": "command", "command": Paths.voiceContextHook.path, "timeout": 30]
+        let merged = HooksJSON.upsertingOwnHook(in: hooksRoot, event: "UserPromptSubmit", hook: hook)
+        let hooksChanged = !NSDictionary(dictionary: merged).isEqual(to: hooksRoot)
+        if hooksChanged {
+            guard let rendered = HooksJSON.render(merged) else { return (false, "Failed to serialize hooks.json") }
+            do { try rendered.write(to: Paths.codexHooks, atomically: true, encoding: .utf8) }
+            catch { return (false, "hooks.json write failed: \(error.localizedDescription)") }
         }
 
-        do {
-            try lines.joined(separator: "\n").write(to: configURL, atomically: true, encoding: .utf8)
-            return (true, added.isEmpty ? "Already configured" : "Configured — approve the hook once in Codex to enable it")
-        } catch {
-            return (false, "Write failed: \(error.localizedDescription)")
+        // config.toml keeps the MCP server; our inline hook tables and the legacy notify line go.
+        let existing = (try? String(contentsOf: Paths.codexConfig, encoding: .utf8)) ?? ""
+        var toml = CodexConfigTOML.strippingOwnHooks(from: existing)
+        if !toml.contains("[mcp_servers.OpenWhisperer]") {
+            while !toml.isEmpty && !toml.hasSuffix("\n\n") { toml += "\n" }
+            toml += "[mcp_servers.OpenWhisperer]\nurl = \"http://localhost:8000/mcp\"\n"
         }
+        let tomlChanged = toml != existing
+        if tomlChanged {
+            do { try toml.write(to: Paths.codexConfig, atomically: true, encoding: .utf8) }
+            catch { return (false, "config.toml write failed: \(error.localizedDescription)") }
+        }
+
+        return (true, hooksChanged || tomlChanged
+                ? "Configured — approve the hook once in Codex to enable it"
+                : "Already configured")
     }
 
     // MARK: - Codex Diagnostics
 
+    /// Connected means the new shape: MCP server in config.toml, hook in hooks.json, and no
+    /// inline copy left behind to trip Codex's both-representations warning.
     static func checkCodexHookConfigured() -> Bool {
-        guard let content = try? String(contentsOf: Paths.codexConfig, encoding: .utf8) else { return false }
-        return content.contains("[mcp_servers.OpenWhisperer]") && content.contains("voice-context.sh")
+        guard let toml = try? String(contentsOf: Paths.codexConfig, encoding: .utf8),
+              toml.contains("[mcp_servers.OpenWhisperer]"),
+              !CodexConfigTOML.hasOwnInlineHook(toml),
+              let data = try? Data(contentsOf: Paths.codexHooks),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+        return HooksJSON.containsOwnHook(json, event: "UserPromptSubmit")
     }
 
     // MARK: - Pi: extension (no MCP)
@@ -396,20 +413,6 @@ enum ConfigManager {
 
     // MARK: - Auto-apply hook to settings.json
 
-    /// Patterns that identify any Open Whisperer TTS hook command
-    private static let hookPatterns = [
-        "tts-hook.sh",
-        "voice-context.sh",
-        "Open Whisperer",
-        "OpenWhisperer",
-        "mlx-openai-whisper",
-    ]
-
-    /// Returns true if a hook command string belongs to Claude Whisper (any variant)
-    private static func isOurHook(_ command: String) -> Bool {
-        hookPatterns.contains { command.contains($0) }
-    }
-
     static func applyHookToSettings() -> (success: Bool, message: String) {
         let settingsDir = Paths.claudeSettings.deletingLastPathComponent()
         let fm = FileManager.default
@@ -424,44 +427,17 @@ enum ConfigManager {
             settings = json
         }
 
-        var hooks = settings["hooks"] as? [String: Any] ?? [:]
+        // Drop any obsolete Stop hook of ours — the `speak` MCP tool replaced it — then register
+        // the UserPromptSubmit voice-turn hook (idempotent: our old entries go first). Both edits
+        // leave every other hook in the file alone.
+        settings = HooksJSON.removingOwnHooks(from: settings, event: "Stop")
+        settings = HooksJSON.upsertingOwnHook(in: settings, event: "UserPromptSubmit",
+                                              hook: ["type": "command", "command": Paths.voiceContextHook.path])
 
-        // Drop any obsolete Stop hook of ours — the `speak` MCP tool replaced it.
-        if var stopArray = hooks["Stop"] as? [[String: Any]] {
-            stopArray.removeAll { entry in
-                guard let inner = entry["hooks"] as? [[String: Any]] else { return false }
-                return inner.contains { (($0["command"] as? String).map(isOurHook) ?? false) }
-            }
-            if stopArray.isEmpty { hooks.removeValue(forKey: "Stop") } else { hooks["Stop"] = stopArray }
-        }
-
-        // Register the UserPromptSubmit voice-turn hook (idempotent: drop our old entries first).
-        var upsArray = hooks["UserPromptSubmit"] as? [[String: Any]] ?? []
-        upsArray.removeAll { entry in
-            guard let inner = entry["hooks"] as? [[String: Any]] else { return false }
-            return inner.contains { (($0["command"] as? String).map(isOurHook) ?? false) }
-        }
-        let upsHook: [String: Any] = ["type": "command", "command": Paths.voiceContextHook.path]
-        upsArray.append(["hooks": [upsHook]])
-        hooks["UserPromptSubmit"] = upsArray
-
-        settings["hooks"] = hooks
-
-        // Write back (convert to 2-space indent to match Claude Code style)
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
-              let rawString = String(data: jsonData, encoding: .utf8) else {
+        // Write back in Claude Code's own style (2-space indent).
+        guard let jsonString = HooksJSON.render(settings) else {
             return (false, "Failed to serialize JSON")
         }
-        // Only replace leading indentation (not spaces inside string values)
-        let jsonString = rawString
-            .components(separatedBy: "\n")
-            .map { line in
-                let leading = line.prefix(while: { $0 == " " })
-                let rest = line.dropFirst(leading.count)
-                let halved = String(repeating: " ", count: leading.count / 2)
-                return halved + rest
-            }
-            .joined(separator: "\n")
 
         do {
             try jsonString.write(to: Paths.claudeSettings, atomically: true, encoding: .utf8)
@@ -562,34 +538,28 @@ enum ConfigManager {
         let fm = FileManager.default
         guard fm.fileExists(atPath: Paths.claudeSettings.path),
               let data = try? Data(contentsOf: Paths.claudeSettings),
-              var settings = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-              var hooks = settings["hooks"] as? [String: Any],
-              var stop = hooks["Stop"] as? [[String: Any]] else { return }
-        let before = stop.count
-        stop.removeAll { entry in
-            guard let inner = entry["hooks"] as? [[String: Any]] else { return false }
-            return inner.contains { (($0["command"] as? String).map(isOurHook) ?? false) }
-        }
-        guard stop.count != before else { return }
-        if stop.isEmpty { hooks.removeValue(forKey: "Stop") } else { hooks["Stop"] = stop }
-        settings["hooks"] = hooks
-        if let out = try? JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]) {
-            try? out.write(to: Paths.claudeSettings)
-        }
+              let settings = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              HooksJSON.containsOwnHook(settings, event: "Stop"),
+              let out = HooksJSON.render(HooksJSON.removingOwnHooks(from: settings, event: "Stop")) else { return }
+        try? out.write(to: Paths.claudeSettings, atomically: true, encoding: .utf8)
+    }
+
+    /// One-shot for installs whose Codex hook still sits inline in ~/.codex/config.toml: move it
+    /// to ~/.codex/hooks.json (Codex warns while a layer carries both). Runs the same idempotent
+    /// apply Connect does, so a fresh or already-migrated install is a no-op.
+    static func migrateCodexInlineHook() {
+        guard let toml = try? String(contentsOf: Paths.codexConfig, encoding: .utf8),
+              CodexConfigTOML.hasOwnInlineHook(toml) else { return }
+        _ = applyHookToCodexConfig()
     }
 
     // MARK: - Diagnostics
 
     static func checkHookConfigured() -> Bool {
         guard let data = try? Data(contentsOf: Paths.claudeSettings),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let hooks = json["hooks"] as? [String: Any],
-              let ups = hooks["UserPromptSubmit"] as? [[String: Any]] else { return false }
-        // Accept any Claude Whisper hook variant as "configured"
-        return ups.contains { entry in
-            guard let inner = entry["hooks"] as? [[String: Any]] else { return false }
-            return inner.contains { (($0["command"] as? String).map(isOurHook) ?? false) }
-        }
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+        // Accept any Open Whisperer hook variant as "configured"
+        return HooksJSON.containsOwnHook(json, event: "UserPromptSubmit")
     }
 
     static func testTTS(port: Int, completion: @escaping (Bool) -> Void) {

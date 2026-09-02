@@ -34,6 +34,8 @@ struct KitTestRunner {
         failures += sttLanguageFailures()
         failures += pickerSearchFailures()
         failures += ttsSampleTextFailures()
+        failures += hooksJSONFailures()
+        failures += codexConfigTOMLFailures()
 
         if failures.isEmpty {
             print("✅ OpenWhispererKit: all checks passed")
