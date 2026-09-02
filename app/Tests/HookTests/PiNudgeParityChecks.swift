@@ -83,6 +83,12 @@ func piNudgeParityFailures() -> [String] {
         failures.append("pi/openwhisperer.ts: \(call) is never called — the nudge does not carry that layer")
     }
 
+    // The article must follow the word: "an American English accent", "an Italian persona".
+    // A hard-coded "a ${…}" is the regression this guards against; the hook picks a/an too.
+    for literal in ["has a ${", "Adopt a ${"] where ext.contains(literal) {
+        failures.append("pi/openwhisperer.ts: hard-coded article in '\(literal)…' — American and Italian read 'a American', 'a Italian'")
+    }
+
     // Syntax gate. Nothing in this repo compiles the extension (Pi does, on /reload), so borrow
     // node's parser when one is on PATH. Skipped silently otherwise: parity above is the check
     // that matters, this only stops a stray brace from shipping.

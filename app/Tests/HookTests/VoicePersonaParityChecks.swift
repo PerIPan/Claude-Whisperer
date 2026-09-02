@@ -69,7 +69,7 @@ func voicePersonaParityFailures() -> [String] {
 
     // The persona line is ungated and rides on every turn for a personified voice, so assert
     // the sentinel `HookTests` keys on elsewhere still surrounds it.
-    if !body.contains("The voice speaking your reply has a") {
+    if !body.contains("The voice speaking your reply has") {
         failures.append("voice-shared.sh: resolve_flavor's persona sentinel changed — VoiceContextChecks keys on it")
     }
 
