@@ -693,17 +693,23 @@ struct WaveStyleView: View {
     // they follow the selected theme, a cached gradient would freeze the palette at whichever
     // theme happened to be active when the overlay first drew — the bars would stay gold after
     // switching to Dark or Sky, until relaunch.
-    private static var waveGradient: LinearGradient {
-        LinearGradient(colors: [OWColor.accent.opacity(0.55), OWColor.accent, OWColor.accentDeep],
-                       startPoint: .leading, endPoint: .trailing)
+    // Colour stops, not `LinearGradient`s: the bars are drawn in a `Canvas` now, which takes
+    // a `Shading`. Still computed `var`s — a `static let` caches once per process and would
+    // freeze the palette at launch, the trap these three gradients fell into before.
+    private static var waveColors: [Color] {
+        [OWColor.accent.opacity(0.55), OWColor.accent, OWColor.accentDeep]
     }
-    private static var idleGradient: LinearGradient {
-        LinearGradient(colors: [OWColor.inkFaint, OWColor.inkSoft, OWColor.inkFaint],
-                       startPoint: .leading, endPoint: .trailing)
+    private static var idleColors: [Color] {
+        [OWColor.inkFaint, OWColor.inkSoft, OWColor.inkFaint]
     }
-    private static var listeningGradient: LinearGradient {
-        LinearGradient(colors: [OWColor.accent, OWColor.accentDeep, OWColor.accent],
-                       startPoint: .leading, endPoint: .trailing)
+    private static var listeningColors: [Color] {
+        [OWColor.accent, OWColor.accentDeep, OWColor.accent]
+    }
+
+    /// Left-to-right shading across `width`, matching the old `.leading`/`.trailing` gradients.
+    private static func shading(_ colors: [Color], width: CGFloat) -> GraphicsContext.Shading {
+        .linearGradient(Gradient(colors: colors),
+                        startPoint: .zero, endPoint: CGPoint(x: width, y: 0))
     }
 
     var body: some View {
@@ -727,19 +733,36 @@ struct WaveStyleView: View {
                 }
             }
 
-            GeometryReader { geo in
-                if isTTSPlaying && recorder.state == .idle {
-                    TimelineView(.animation(minimumInterval: 0.03)) { timeline in
+            // `Canvas`, not `Shape.fill`. Both branches redraw constantly — the speaking
+            // animation at 33 fps for the whole reply, the recording wave on every
+            // `levelHistory` publish (~90/s) — and a Shape rebuilds a 50-bar `Path` *and* a
+            // fresh view identity to diff on every one of those frames. Measured 2026-09-06:
+            // while a reply played, the app used ~14.9% of a core with the overlay visible
+            // and 4.1% with it hidden, so this view was ~11 points — roughly three quarters
+            // of the total, and an order of magnitude more than the analyzer filterbank.
+            // The spectrum styles in SpectrumStyles.swift already draw this way.
+            if isTTSPlaying && recorder.state == .idle {
+                TimelineView(.animation(minimumInterval: Self.speakingFrameInterval)) { timeline in
+                    Canvas { context, size in
                         let time = timeline.date.timeIntervalSinceReferenceDate
                         let levels = Self.ttsLevels(count: 50, time: time)
-                        Self.mirroredLines(levels: levels, size: geo.size)
-                            .fill(Self.waveGradient)
+                        context.fill(Self.mirroredLines(levels: levels, size: size),
+                                     with: Self.shading(Self.waveColors, width: size.width))
                     }
-                } else {
-                    let gradient = recorder.state == .listening ? Self.listeningGradient : Self.idleGradient
-                    Self.mirroredLines(levels: recorder.levelHistory.map { CGFloat($0) }, size: geo.size)
-                        .fill(recorder.state == .recording ? Self.waveGradient : gradient)
-                        .opacity(recorder.state == .uploading ? 0.5 : recorder.state == .idle ? 0.4 : 1.0)
+                }
+            } else {
+                Canvas { context, size in
+                    context.opacity = recorder.state == .uploading ? 0.5
+                        : recorder.state == .idle ? 0.4 : 1.0
+                    let colors: [Color]
+                    switch recorder.state {
+                    case .recording: colors = Self.waveColors
+                    case .listening: colors = Self.listeningColors
+                    default: colors = Self.idleColors
+                    }
+                    context.fill(
+                        Self.mirroredLines(levels: recorder.levelHistory.map { CGFloat($0) }, size: size),
+                        with: Self.shading(colors, width: size.width))
                 }
             }
         }
@@ -798,6 +821,14 @@ struct WaveStyleView: View {
         }
         return path
     }
+
+    /// Redraw interval for the speaking animation. `TimelineView(.animation)` quantises to the
+    /// display refresh, so on a 60 Hz panel this is every third frame — 20 fps. The wave is a
+    /// decorative sine blend, not a reading of the audio, and the redraw rate is what this view
+    /// costs: it is drawn over the overlay's blur material, so every frame recomposites the
+    /// window. 0.03 (30 fps) measured ~10 points of a core while speaking; the difference at
+    /// 20 fps is not visible on a smooth wave.
+    private static let speakingFrameInterval: Double = 0.05
 
     /// Sine-blended levels for the TTS "speaking" animation.
     private static func ttsLevels(count: Int, time: Double) -> [CGFloat] {

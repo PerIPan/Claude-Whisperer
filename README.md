@@ -37,10 +37,10 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ### 2.0.5
 
-- **The app stopped burning CPU while doing nothing.** After the first spoken reply, roughly 1% of a CPU core was consumed continuously for as long as the app stayed open — analyzing audio silence into a spectrum that, on the default overlay style, nothing draws. The analysis now runs only when a spectrum is actually on screen. Battery and fan behaviour on an idle machine should be noticeably better.
-- **The speaking indicator works in every mode.** The "Playing…" status and the speaker icon on the voice preview button only ever updated in Hands-Free; in Press-to-Talk and Hold-to-Talk they were permanently dark. They now follow real playback everywhere.
+- **The speaking indicator works in every mode.** The "Playing…" status and the speaker icon on the voice preview button only ever updated in Hands-Free; in Press-to-Talk and Hold-to-Talk they were permanently dark. Playback state is now published inside the app rather than polled off disk, so they follow real playback everywhere — and react immediately instead of up to a third of a second late.
 - **No more frozen bars on the overlay.** Leaving Hands-Free mid-listen could strand the last analyzer frame on screen, redrawing at 30 fps indefinitely instead of going quiet.
-- **Quieter background timers.** Two polls that run for the whole life of the app now let macOS batch their wakeups, which is what Apple's energy guidance asks for.
+- **The audio spectrum is only analyzed when something draws it.** Every audio buffer was reduced to 96 frequency bands on both the microphone and playback paths, including for the default overlay style, which doesn't display them. That work is now skipped unless a spectrum is actually on screen.
+- **Quieter background timers.** Two polls that run for the whole life of the app now let macOS batch their wakeups.
 - **The debug log is capped.** `paste_debug.log` had no size limit and grew for the life of an install.
 
 ### 2.0.4

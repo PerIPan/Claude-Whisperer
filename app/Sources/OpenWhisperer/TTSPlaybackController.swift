@@ -22,6 +22,12 @@ actor TTSPlaybackController {
 
     private var playQueue: [QueueItem] = []
     private var currentItem: QueueItem?
+    private var drainWatchdog: Task<Void, Never>?
+
+    /// Slack added to the scheduled audio's own duration before the drain watchdog gives up.
+    /// Generous on purpose: firing early would cut off a reply, and the failure it catches
+    /// is permanent, so being late costs nothing.
+    private static let drainGrace: TimeInterval = 10
 
     /// Bumped on barge-in to invalidate the entire queue and any active playback.
     private var generation = 0
@@ -97,6 +103,7 @@ actor TTSPlaybackController {
         }
 
         playTask = Task {
+            var scheduledFrames = 0
             // Hold off playing if the user is currently speaking/recording.
             while await self.isUserRecording() {
                 if Task.isCancelled || parentGen != self.generation || itemGen != self.activeItemGen { return }
@@ -111,13 +118,15 @@ actor TTSPlaybackController {
                 do {
                     let (samples, _) = try await self.tts.synthesizeSamples(sentence, voice: item.voice, speed: item.speed)
                     if Task.isCancelled || parentGen != self.generation || itemGen != self.activeItemGen { break }
+                    scheduledFrames += samples.count
                     self.engine.schedule(samples, volume: volume)
                 } catch {
                     NSLog("TTSPlaybackController: synthesis failed: \(error)")
                     break
                 }
             }
-            self.synthFinished(itemGen: itemGen, parentGen: parentGen)
+            self.synthFinished(itemGen: itemGen, parentGen: parentGen,
+                               scheduledFrames: scheduledFrames)
         }
     }
 
@@ -128,6 +137,8 @@ actor TTSPlaybackController {
         currentItem = nil
         playTask?.cancel()
         playTask = nil
+        drainWatchdog?.cancel()
+        drainWatchdog = nil
         engine.stop()
         removeLock()
     }
@@ -136,6 +147,8 @@ actor TTSPlaybackController {
 
     private func itemFinished(itemGen: Int, parentGen: Int) {
         guard parentGen == generation && itemGen == activeItemGen else { return }
+        drainWatchdog?.cancel()
+        drainWatchdog = nil
         currentItem = nil
         startNext()
   }
@@ -149,10 +162,44 @@ actor TTSPlaybackController {
 
     /// The synthesis loop ended. Finish now if the queue is already empty; otherwise the final
     /// drain callback will.
-    private func synthFinished(itemGen: Int, parentGen: Int) {
+    private func synthFinished(itemGen: Int, parentGen: Int, scheduledFrames: Int) {
         guard parentGen == generation && itemGen == activeItemGen else { return }
         synthDone = true
-        if engine.isIdle { itemFinished(itemGen: itemGen, parentGen: parentGen) }
+        if engine.isIdle {
+            itemFinished(itemGen: itemGen, parentGen: parentGen)
+            return
+        }
+        // Everything is scheduled; normally the drain callback finishes the item. But that
+        // callback only arrives if the output device actually renders — with an aggregate /
+        // multi-output device whose member is disconnected, `engine.start()` succeeds and
+        // nothing plays, so `pending` never returns to zero. Without this watchdog the lock
+        // is never released and the overlay's 33 fps "Speaking…" animation runs for the life
+        // of the process (~12% of a core, observed 2026-09-06).
+        let expected = Double(scheduledFrames) / AudioPlaybackEngine.defaultSampleRate
+        startDrainWatchdog(itemGen: itemGen, parentGen: parentGen, after: expected + Self.drainGrace)
+    }
+
+    private func startDrainWatchdog(itemGen: Int, parentGen: Int, after seconds: TimeInterval) {
+        drainWatchdog?.cancel()
+        drainWatchdog = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(max(1, seconds) * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            await self?.drainTimedOut(itemGen: itemGen, parentGen: parentGen)
+        }
+    }
+
+    /// The scheduled audio outlived its own duration plus slack without draining. Treat it
+    /// like a playback failure: stop the graph (which resets `pending`, so the next utterance
+    /// isn't queued behind a count that will never clear) and release the UI.
+    private func drainTimedOut(itemGen: Int, parentGen: Int) {
+        guard parentGen == generation, itemGen == activeItemGen, !engine.isIdle else { return }
+        NSLog("TTSPlaybackController: playback never drained — output device may not be rendering")
+        drainWatchdog = nil
+        playTask?.cancel()
+        engine.stop()
+        playQueue.removeAll()
+        currentItem = nil
+        removeLock()
     }
 
     /// The audio engine failed to start (e.g. the output device was removed mid-reply). Drop the
@@ -160,6 +207,8 @@ actor TTSPlaybackController {
     private func handlePlaybackError(itemGen: Int, parentGen: Int) {
         guard parentGen == generation && itemGen == activeItemGen else { return }
         playTask?.cancel()
+        drainWatchdog?.cancel()
+        drainWatchdog = nil
         playQueue.removeAll()
         currentItem = nil
         removeLock()
