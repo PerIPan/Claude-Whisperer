@@ -24,7 +24,7 @@ The command to bypass Gatekeeper for the DMG:
 xattr -cr /Applications/OpenWhisperer.app
 
 If you want to do it on the DMG itself before opening:
-xattr -d com.apple.quarantine ~/Downloads/OpenWhisperer-2.0.4.dmg
+xattr -d com.apple.quarantine ~/Downloads/OpenWhisperer-2.0.5.dmg
 
 
 ## What It Does
@@ -34,6 +34,14 @@ You use your coding agent — **Claude Code, Codex, Antigravity, or Pi** — nor
 Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ## What's New
+
+### 2.0.5
+
+- **The app stopped burning CPU while doing nothing.** After the first spoken reply, roughly 1% of a CPU core was consumed continuously for as long as the app stayed open — analyzing audio silence into a spectrum that, on the default overlay style, nothing draws. The analysis now runs only when a spectrum is actually on screen. Battery and fan behaviour on an idle machine should be noticeably better.
+- **The speaking indicator works in every mode.** The "Playing…" status and the speaker icon on the voice preview button only ever updated in Hands-Free; in Press-to-Talk and Hold-to-Talk they were permanently dark. They now follow real playback everywhere.
+- **No more frozen bars on the overlay.** Leaving Hands-Free mid-listen could strand the last analyzer frame on screen, redrawing at 30 fps indefinitely instead of going quiet.
+- **Quieter background timers.** Two polls that run for the whole life of the app now let macOS batch their wakeups, which is what Apple's energy guidance asks for.
+- **The debug log is capped.** `paste_debug.log` had no size limit and grew for the life of an install.
 
 ### 2.0.4
 
@@ -109,7 +117,7 @@ Everything runs on your Mac — no cloud APIs, no data leaves your machine.
 
 ## Install
 
-[**Download OpenWhisperer-2.0.4.dmg**](https://github.com/PerIPan/OpenWhisperer/releases/download/v2.0.4/OpenWhisperer-2.0.4.dmg) — drag to Applications and launch.
+[**Download OpenWhisperer-2.0.5.dmg**](https://github.com/PerIPan/OpenWhisperer/releases/download/v2.0.5/OpenWhisperer-2.0.5.dmg) — drag to Applications and launch.
 
 On first launch, the app:
 - Downloads the Whisper (speech-to-text) and Kokoro (text-to-speech) CoreML models
@@ -282,7 +290,7 @@ chmod +x build-dmg.sh
 ./build-dmg.sh
 ```
 
-This produces `OpenWhisperer.app` and `OpenWhisperer-2.0.4.dmg` in `app/.build/`. Launch the app — on first launch it downloads the Whisper and Kokoro models, then starts the in-app TTS server on `localhost:8000` automatically. (For a plain debug build during development, run `swift build` from `app/`.)
+This produces `OpenWhisperer.app` and `OpenWhisperer-2.0.5.dmg` in `app/.build/`. Launch the app — on first launch it downloads the Whisper and Kokoro models, then starts the in-app TTS server on `localhost:8000` automatically. (For a plain debug build during development, run `swift build` from `app/`.)
 
 ### Step 2: Wire up the hooks
 
