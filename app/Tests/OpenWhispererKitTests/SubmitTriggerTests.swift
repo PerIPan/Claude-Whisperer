@@ -26,6 +26,7 @@ struct KitTestRunner {
         failures += spectrumBandsFailures()
         failures += dotMatrixFailures()
         failures += overlayStyleFailures()
+        failures += diagLogTrimFailures()
         failures += peakHoldFailures()
         failures += overlaySizeFailures()
         failures += vocabularyCorrectorFailures()

@@ -44,6 +44,9 @@ class AccessibilityManager: ObservableObject {
                 self.isGranted = trusted
             }
         }
+        // AX has no change notification, so this poll has to stay — but it runs for the
+        // app's whole lifetime, so let the scheduler coalesce its wakeups.
+        timer.tolerance = 0.5
         RunLoop.main.add(timer, forMode: .common)
         pollTimer = timer
     }

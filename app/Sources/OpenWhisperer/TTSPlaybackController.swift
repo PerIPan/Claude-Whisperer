@@ -4,8 +4,9 @@ import OpenWhispererKit
 
 /// Orchestrates in-process TTS playback: splits text into sentences, synthesizes each via
 /// `KokoroTTS`, and schedules them onto a gapless `AudioPlaybackEngine` so the first sentence plays
-/// while later ones synthesize. Owns the `tts_playing.lock` file the app polls for the "Speaking…"
-/// state (overlay waveform + hands-free mic-muting). Barge-in cancels pending synthesis — freeing
+/// while later ones synthesize. Owns the `tts_playing.lock` file and publishes the same
+/// "Speaking…" state in-process via `TTSPlaybackState` (overlay waveform + hands-free
+/// mic-muting subscribe to it). Barge-in cancels pending synthesis — freeing
 /// the ANE for STT — and stops audio instantly.
 actor TTSPlaybackController {
     private let tts: TTSEngines
@@ -167,9 +168,16 @@ actor TTSPlaybackController {
     // MARK: - Lock file + volume
 
     private var lockURL: URL { Paths.appSupport.appendingPathComponent("tts_playing.lock") }
-    private func writeLock() { try? Data().write(to: lockURL) }
+    // The lock file stays — it is part of the documented Application Support bus — but the
+    // app no longer polls it back off disk to learn its own state; `TTSPlaybackState` is the
+    // in-process signal the overlay and DictationManager subscribe to.
+    private func writeLock() {
+        try? Data().write(to: lockURL)
+        TTSPlaybackState.shared.set(true)
+    }
     private func removeLock() {
         try? FileManager.default.removeItem(at: lockURL)
+        TTSPlaybackState.shared.set(false)
         // Playback has fully stopped (queue drained, barge-in, or playback error) —
         // clear the wave instead of leaving it frozen on the last levels.
         PlaybackLevelMeter.shared.reset()

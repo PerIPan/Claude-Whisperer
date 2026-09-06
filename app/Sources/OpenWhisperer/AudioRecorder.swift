@@ -225,7 +225,9 @@ class AudioRecorder: ObservableObject {
             self.onRawAudioBuffer?(buffer)
 
             let rms = self.computeRMS(buffer: buffer)
-            let bands = self.spectrumBands(buffer: buffer)
+            // Skipped unless something is actually displaying the bands — the default
+            // `.wave` overlay style reads levelHistory, not these. See `SpectrumGate`.
+            let bands = SpectrumGate.isEnabled ? self.spectrumBands(buffer: buffer) : nil
             DispatchQueue.main.async {
                 // Drop stale publishes: a tap callback can enqueue this block just
                 // before stopRecording() (also on main) removes the tap and clears
@@ -236,7 +238,7 @@ class AudioRecorder: ObservableObject {
                 self.audioLevel = self.audioLevel * (1 - self.smoothing) + rms * self.smoothing
                 self.levelHistory.removeFirst()
                 self.levelHistory.append(self.audioLevel)
-                self.spectrumBands = bands
+                if let bands { self.spectrumBands = bands }
 
                 // Silence detection for hands-free mode
                 if self.silenceDetectionEnabled {
@@ -295,6 +297,7 @@ class AudioRecorder: ObservableObject {
 
     func reset() {
         dispatchPrecondition(condition: .onQueue(.main))
+        spectrumBands = []
         state = .idle
     }
 
@@ -307,6 +310,14 @@ class AudioRecorder: ObservableObject {
         converter = nil
         pcmBuffers = []
         bufferLock.unlock()
+        // Clear the analyzer frame too. `stopRecording()` does this, but `cleanup()` is the
+        // path taken by `stopEngine()` (leaving hands-free) and by an engine-start failure,
+        // and a leftover non-zero frame keeps the spectrum canvas *unpaused* — its
+        // TimelineView only pauses on all-zero bands — redrawing a frozen bar at 30 fps
+        // until the next dictation.
+        audioLevel = 0
+        levelHistory = Array(repeating: 0, count: 50)
+        spectrumBands = []
         state = .idle
     }
 

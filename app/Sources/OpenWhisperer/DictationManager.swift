@@ -88,15 +88,34 @@ class DictationManager: ObservableObject {
     private var activeTranscribeTask: Task<Void, Never>?
     /// True while a barge-in recording is active — prevents handleTTSStateChange from resetting to keyword mode
     private var bargedIn = false
-    /// Monitors the TTS lock file for barge-in / mic muting
-    private var ttsLockMonitor: DispatchSourceFileSystemObject?
-    private var ttsLockTimer: Timer?
+    /// Mirrors `TTSPlaybackState.shared.isPlaying` for barge-in / mic muting. Was a 0.5 s
+    /// `tts_playing.lock` poll started only by `activateHandsFree()` until 2026-09-06 —
+    /// which left `ttsPlaying` permanently false in the default hold-to-talk mode, so the
+    /// Settings → Voice preview button never showed playback.
+    private var ttsStateSink: AnyCancellable?
 
     init() {
         recorderSink = recorder.$state
             .receive(on: RunLoop.main)
             .sink { [weak self] newState in
                 self?.recorderState = newState
+            }
+
+        // Playback state is published in-process; the handler still gates itself on
+        // hands-free, so subscribing unconditionally changes nothing but the indicators.
+        //
+        // DispatchQueue.main, NOT RunLoop.main: Combine's RunLoop scheduler delivers in the
+        // default run-loop mode only, while the main dispatch queue's source is in
+        // kCFRunLoopCommonModes. The timer this replaced was deliberately registered
+        // `forMode: .common` "so it fires even when the menubar popover is open" (L-6);
+        // RunLoop.main here would silently give that back, deferring the hands-free mic mute
+        // and leaving `handleBargeIn`'s `ttsPlaying` guard stale while a menu is tracking.
+        ttsStateSink = TTSPlaybackState.shared.$isPlaying
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] playing in
+                guard let self, playing != self.ttsPlaying else { return }
+                self.ttsPlaying = playing
+                self.handleTTSStateChange(playing: playing)
             }
 
         // Surface audio-engine failures to the UI instead of failing silently (T2.3)
@@ -401,8 +420,9 @@ class DictationManager: ObservableObject {
             self.isCalibrating = false
             // Start keyword detection
             self.keywordDetector.start()
-            // Start TTS lock monitoring
-            self.startTTSLockMonitoring()
+            // Catch up if a reply is already being spoken — the poll this replaced
+            // reported that on its first tick.
+            if self.ttsPlaying { self.handleTTSStateChange(playing: true) }
             os_log(.default, log: dictLog, "Hands-free activated, ambient: %.4f", self.recorder.ambientNoiseFloor)
         }
     }
@@ -416,7 +436,6 @@ class DictationManager: ObservableObject {
         activeTranscribeTask = nil
         recorder.silenceDetectionEnabled = false
         keywordDetector.stop()
-        stopTTSLockMonitoring()
         if recorder.state == .listening || recorder.state == .recording || recorder.state == .uploading {
             recorder.stopEngine()
         }
@@ -557,33 +576,15 @@ class DictationManager: ObservableObject {
         recorder.startBuffering()
     }
 
-    // MARK: - TTS Lock File Monitoring
-
-    private func startTTSLockMonitoring() {
-        // Poll for lock file every 0.5s (simpler and more reliable than DispatchSource)
-        // Use .common RunLoop mode so timer fires even when menubar popover is open (L-6)
-        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            let lockPath = Paths.appSupport.appendingPathComponent("tts_playing.lock").path
-            let playing = FileManager.default.fileExists(atPath: lockPath)
-            if playing != self.ttsPlaying {
-                self.ttsPlaying = playing
-                self.handleTTSStateChange(playing: playing)
-            }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        ttsLockTimer = timer
-    }
-
-    private func stopTTSLockMonitoring() {
-        ttsLockTimer?.invalidate()
-        ttsLockTimer = nil
-        ttsPlaying = false
-    }
-
     private func handleTTSStateChange(playing: Bool) {
         dispatchPrecondition(condition: .onQueue(.main))
         guard interactionMode == .handsFree else { return }
+        // Stay out of the ~0.8 s ambient calibration. The poll this replaced was started
+        // *inside* `calibrateAmbient`'s completion, so it structurally could not fire here;
+        // the permanent subscription can, and resuming the recorder or starting the keyword
+        // detector mid-sample would skew `ambientNoiseFloor` (audibly so, if the reply is
+        // playing out loud). `activateHandsFree` catches up once calibration finishes.
+        guard !isCalibrating else { return }
 
         if playing {
             // TTS started — stop STT buffering, keep keyword detection for barge-in
@@ -744,9 +745,13 @@ class DictationManager: ObservableObject {
         let armed = Self.computeSpeakArmed(voiceTurnEligible: lastDictationTargetIsCLIHost)
         if speakArmed != armed { speakArmed = armed }
         if armed, speakArmedTimer == nil {
-            speakArmedTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
                 self?.refreshSpeakArmed()
             }
+            // The indicator is advisory and its TTL is 90 s — let the scheduler coalesce
+            // this wakeup with others rather than pinning it to the second.
+            timer.tolerance = 0.2
+            speakArmedTimer = timer
         } else if !armed {
             speakArmedTimer?.invalidate()
             speakArmedTimer = nil
@@ -807,13 +812,14 @@ class DictationManager: ObservableObject {
 
     /// Barge-in: stop any currently playing TTS when recording starts. Playback is in-process
     /// (Phase 3) — a direct actor call stops audio and cancels pending synthesis (freeing the ANE
-    /// for STT). The controller removes `tts_playing.lock`; we also remove it directly so the
-    /// lock-file poll reacts immediately even if the controller is unset.
+    /// for STT). The controller removes `tts_playing.lock` and clears `TTSPlaybackState`; we do
+    /// both directly too, so the UI reacts immediately even if the controller is unset.
     func killTTS() {
         let controller = ttsController
         Task { await controller?.bargeIn() }
         try? FileManager.default.removeItem(
             at: Paths.appSupport.appendingPathComponent("tts_playing.lock"))
+        TTSPlaybackState.shared.set(false)
     }
 
     // MARK: - Insert Text (main thread orchestrator)
@@ -1121,6 +1127,25 @@ class DictationManager: ObservableObject {
     /// Formatter lives on diagQueue — only accessed there to avoid thread-safety issues (M-8)
     private static let diagFormatter = ISO8601DateFormatter()
 
+    /// Largest `paste_debug.log` we keep before halving it. It appends a couple of lines per
+    /// dictation and was never rotated, so it grew for the life of the install (210 KB
+    /// observed — roughly 3000 dictations, so this fires rarely).
+    private static let diagLogMaxBytes = 256 * 1024
+
+    /// Apply the cap. Which bytes survive is decided by the unit-tested `DiagLogTrim`; this
+    /// only does the I/O. Called on `diagQueue` before each append, so it is serialized with
+    /// *our* writes — note `KeywordDetector.kwLog` appends to the same file from the main
+    /// thread on its own handle, so the atomic replace can drop one of its in-flight lines.
+    /// Acceptable: both writers are diagnostics-only, and the pre-existing interleaving
+    /// hazard between them is unchanged by this.
+    private static func trimDiagLogIfNeeded(at url: URL) {
+        guard let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int,
+              size > diagLogMaxBytes,
+              let data = try? Data(contentsOf: url),
+              let trimmed = DiagLogTrim.trimmed(data, maxBytes: diagLogMaxBytes) else { return }
+        try? trimmed.write(to: url, options: .atomic)
+    }
+
     private func diagLog(_ msg: String) {
         let date = Date()
         Self.diagQueue.async {
@@ -1128,6 +1153,7 @@ class DictationManager: ObservableObject {
             guard let data = "[\(timestamp)] \(msg)\n".data(using: .utf8) else { return }
             let diagPath = Paths.appSupport.appendingPathComponent("paste_debug.log")
             if FileManager.default.fileExists(atPath: diagPath.path) {
+                Self.trimDiagLogIfNeeded(at: diagPath)
                 if let fh = try? FileHandle(forWritingTo: diagPath) {
                     fh.seekToEndOfFile()
                     fh.write(data)

@@ -40,7 +40,11 @@ final class AudioPlaybackEngine {
         // Output-band tap for the overlay's "Speaking…" spectrum display. Installed once
         // here (not per-utterance) so it lives for the engine's whole lifetime. Runs on
         // an AVAudioEngine render thread; PlaybackLevelMeter.push hops to the main queue.
+        // The gate matters most here: a normal drain never stops this engine (only barge-in
+        // and a configuration change do), so after the first spoken reply it keeps running
+        // and keeps delivering silent buffers to this tap. See `SpectrumGate`.
         engine.mainMixerNode.installTap(onBus: 0, bufferSize: 2_048, format: nil) { buffer, _ in
+            guard SpectrumGate.isEnabled else { return }
             PlaybackLevelMeter.shared.push(bands: Self.spectrumBands(buffer: buffer))
         }
 

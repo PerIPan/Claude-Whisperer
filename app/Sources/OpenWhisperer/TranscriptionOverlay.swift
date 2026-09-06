@@ -73,9 +73,13 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
         objectWillChange.send()
     }
 
-    @Published var isVisible: Bool = false
+    @Published var isVisible: Bool = false {
+        didSet { SpectrumGate.update(visible: isVisible, style: analyzerStyle) }
+    }
+    /// Mirrors `TTSPlaybackState.shared.isPlaying`, subscribed once in `show()`. Was a
+    /// 0.3 s `tts_playing.lock` poll until 2026-09-06 — the writer is in this process.
     @Published var isTTSPlaying: Bool = false
-    private var ttsTimer: Timer?
+    private var ttsStateCancellable: AnyCancellable?
 
     /// The current PTT key label shown in the overlay (e.g. "Ctrl", "fn").
     @Published var pttKeyLabel: String = "Ctrl"
@@ -84,6 +88,7 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
     /// file on show(); Settings writes the file and updates this directly.
     @Published var analyzerStyle: OverlayStyle = .defaultStyle {
         didSet {
+            SpectrumGate.update(visible: isVisible, style: analyzerStyle)
             guard oldValue != analyzerStyle, window != nil else { return }
             if analyzerStyle == .wave { applyWaveHeight() } else { restoreSavedHeight() }
         }
@@ -289,19 +294,17 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
         self.window = w
         isVisible = true
         if analyzerStyle == .wave { applyWaveHeight() }
-        startTTSPolling()
+        mirrorTTSPlaybackState()
     }
 
     func hide() {
         try? "on".write(to: Paths.overlayHidden, atomically: true, encoding: .utf8)
-        stopTTSPolling()
         window?.close()
         window = nil
         isVisible = false
     }
 
     func windowWillClose(_ notification: Notification) {
-        stopTTSPolling()
         window = nil
         isVisible = false
     }
@@ -331,23 +334,17 @@ class TranscriptionOverlay: NSObject, NSWindowDelegate, ObservableObject {
         return image
     }
 
-    private func startTTSPolling() {
-        ttsTimer?.invalidate()
-        let lockPath = Paths.appSupport.appendingPathComponent("tts_playing.lock").path
-        let timer = Timer(timeInterval: 0.3, repeats: true) { [weak self] _ in
-            let playing = FileManager.default.fileExists(atPath: lockPath)
-            if self?.isTTSPlaying != playing {
-                self?.isTTSPlaying = playing
+    /// Mirror the in-process playback state. Set up once and kept for the app's lifetime:
+    /// an idle Combine subscription costs nothing, where the timer it replaced woke the
+    /// main thread 3.3x/second from launch for the life of the process.
+    private func mirrorTTSPlaybackState() {
+        guard ttsStateCancellable == nil else { return }
+        ttsStateCancellable = TTSPlaybackState.shared.$isPlaying
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] playing in
+                guard let self, self.isTTSPlaying != playing else { return }
+                self.isTTSPlaying = playing
             }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        ttsTimer = timer
-    }
-
-    private func stopTTSPolling() {
-        ttsTimer?.invalidate()
-        ttsTimer = nil
-        isTTSPlaying = false
     }
 
     // MARK: - Status mirroring
