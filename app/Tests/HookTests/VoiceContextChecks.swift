@@ -488,6 +488,27 @@ func voiceContextFailures() -> [String] {
         if n?.contains("in German") == true { fail("pinnedEnglishOverVoice: voice language leaked into a pinned line") }
     }
 
+    // 38) a BCP-47 pin with a region or script subtag pins the base language: `pt-BR`, `pt_BR`.
+    do {
+        for raw in ["pt-BR", "pt_BR", "PT-br"] {
+            let s = newSandbox()
+            s.writeVoiceTurn(forPrompt: "go"); s.writeTtsVoice("af_heart"); s.writeTtsLanguage(raw)
+            let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"), sandbox: s).stdout)
+            if n?.contains("in Portuguese, whatever language the conversation is in") != true { fail("pinSubtag(\(raw)): \(n?.debugDescription ?? "nil")") }
+        }
+    }
+
+    // 39) `english` keeps working as a pin — the first cut of OW_TTS_LANGUAGE accepted it, and
+    //     a hand-written tts_language file may still say so. Case-insensitive, like the codes.
+    do {
+        for raw in ["english", "English", " ENGLISH "] {
+            let s = newSandbox()
+            s.writeVoiceTurn(forPrompt: "go"); s.writeTtsVoice("supertonic:de:M1"); s.writeTtsLanguage(raw)
+            let n = nudge(Hook.run("voice-context.sh", stdin: input(prompt: "go", session: "s1"), sandbox: s).stdout)
+            if n?.contains("in English, whatever language the conversation is in") != true { fail("pinEnglishAlias(\(raw)): \(n?.debugDescription ?? "nil")") }
+        }
+    }
+
     // 37) an unknown tts_language is ignored, not turned into a broken pin: the voice rule applies.
     do {
         let s = newSandbox()

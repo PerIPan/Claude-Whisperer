@@ -61,11 +61,14 @@ final class TTSEngines: Sendable {
     /// names a language Supertonic can't speak — see `TTSLanguageFollow`.
     private static func supertonicLanguage(for text: String, route: TTSVoiceRoute) -> String {
         let voiceLanguage = route.language ?? "en"
-        let language = TextLanguageDetector.language(for: text, voiceLanguage: voiceLanguage)
+        let guess = TextLanguageDetector.guess(for: text)
+        let language = TTSLanguageFollow.language(forVoiceLanguage: voiceLanguage, text: text, guess: guess)
         if language != voiceLanguage {
-            // A heuristic that can misfire deserves a trace: this is the line to look for when
-            // a sentence comes out in the wrong language.
-            NSLog("TTSEngines: supertonic \(voiceLanguage) → \(language) for \"\(text.prefix(40))\"")
+            // A heuristic that can misfire deserves a trace: this is the line to look for when a
+            // sentence comes out in the wrong language. Metadata only — the text is the user's
+            // conversation and NSLog lands in system logs.
+            let confidence = guess.map { String(format: "%.2f", $0.confidence) } ?? "n/a"
+            NSLog("TTSEngines: supertonic \(voiceLanguage) → \(language) (confidence \(confidence), \(text.count) chars)")
         }
         return language
     }

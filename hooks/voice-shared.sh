@@ -191,7 +191,11 @@ resolve_language_line() {
   # Supertonic voice gets none either (English is already the default).
   local pin="$OW_TTS_LANGUAGE"
   [ -z "$pin" ] && pin=$(cat "$APP_SUPPORT/tts_language" 2>/dev/null)
-  pin=$(printf '%s' "$pin" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+  # Normalize the pin: whitespace, case, and a BCP-47 region/script subtag (`pt-BR`, `pt_BR`
+  # → `pt`). `english` stays accepted — the first cut of OW_TTS_LANGUAGE took it, and a
+  # hand-written tts_language file may still say so. Codes are the contract otherwise.
+  pin=$(printf '%s' "$pin" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]' | cut -d- -f1 | cut -d_ -f1)
+  [ "$pin" = "english" ] && pin="en"
 
   local voice="$OW_TTS_VOICE"
   [ -z "$voice" ] && voice=$(cat "$APP_SUPPORT/tts_voice" 2>/dev/null)

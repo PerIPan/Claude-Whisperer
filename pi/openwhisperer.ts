@@ -133,7 +133,10 @@ const LANGUAGES: Record<string, string> = {
 };
 
 function resolveLanguageLine(): string {
-  const pin = readPref("OW_TTS_LANGUAGE", "tts_language", "").replace(/\s+/g, "").toLowerCase();
+  // Same normalization as the hook: whitespace, case, a BCP-47 subtag (`pt-BR` → `pt`), and
+  // the `english` alias the first cut of OW_TTS_LANGUAGE accepted.
+  let pin = readPref("OW_TTS_LANGUAGE", "tts_language", "").replace(/\s+/g, "").toLowerCase().split(/[-_]/)[0];
+  if (pin === "english") pin = "en";
   const pinned = LANGUAGES[pin];
   // Sentinel phrase kept distinct from resolveFlavor's "voice speaking your reply" so the two
   // layers stay independently assertable.
