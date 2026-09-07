@@ -30,9 +30,11 @@ let package = Package(
         // Release 0.15.5+ contains the #730 fix ("Fix KokoroAne strided MLMultiArray handling")
         // which resolves issue #727 where 0.15.4 mis-read a *strided* MLMultiArray the Kokoro
         // chain returned on some Apple Silicon (e.g. M3/macOS 15), yielding fluent-but-WRONG words.
+        // Release 0.15.6 adds #783: smart apostrophes (U+2019/U+2018/U+02BC) are folded to ASCII
+        // before tokenizing, so "I’ll" no longer splits into "I" + "ll" and gets read as "I L".
         .package(
             url: "https://github.com/FluidInference/FluidAudio.git",
-            from: "0.15.5"),
+            from: "0.15.6"),
     ],
     targets: [
         // Pure, dependency-free logic that is unit-tested in isolation
