@@ -182,6 +182,14 @@ article() {
 # Kokoro voices are unaffected (their language is implied by the voice and the model already
 # replies in the user's language); `en` gets no line since English is the default.
 resolve_language_line() {
+  local lang_override="$OW_TTS_LANGUAGE"
+  [ -z "$lang_override" ] && lang_override=$(cat "$APP_SUPPORT/tts_language" 2>/dev/null | tr -d '[:space:]')
+  lang_override=$(printf '%s' "$lang_override" | tr '[:upper:]' '[:lower:]')
+  if [ "$lang_override" = "en" ] || [ "$lang_override" = "english" ]; then
+    echo " Write the text you pass to \`speak\` in English, keeping the voice's persona."
+    return
+  fi
+
   local voice="$OW_TTS_VOICE"
   [ -z "$voice" ] && voice=$(cat "$APP_SUPPORT/tts_voice" 2>/dev/null)
   voice=$(printf '%s' "$voice" | tr -d '[:space:]')
